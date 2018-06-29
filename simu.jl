@@ -81,7 +81,7 @@ end
 
         println("Output de Planner = ", x_sol)
 
-        setlowerbound(x[:,1],1)
+        setlowerbound.(x[:,1],1)
         #if t_index > 1
         #    for (i,t) in keys(x)
         #        println(t_index)
