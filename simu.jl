@@ -14,17 +14,17 @@ include("monolith.jl")
     Dem1=rand(d,5);Dem2=rand(d,5);Dem3=rand(d,5);Dem4=rand(d,5);
     Dem=hcat(Dem1,Dem2,Dem3,Dem4)
 
-    #=
+    ##=
     Dem = [
             0           10000       20000       0
             15000       10000       5000        15000
             20000       30000       40000       20000
             20000       10000       3000        20000
             20000       10000       2000        20000]
-    =#
+    ##=#
 end
 
-@resumable function Planner(sim::Simulation, Dem::Array{Float64,2}, m::Model)
+@resumable function Planner(sim::Simulation, m::Model)
     x = getindex(m, :x)
 
     solve(m)
@@ -47,10 +47,10 @@ end
 
     if fail <= fail_prob
         metric = x+3
-        println("Hubo un fallo :(")
+        println("Hubo un fallo :( ")
     else
         metric = x+1
-        println("No hubo ningún fallo :)")
+        println("No hubo ningún fallo :) ")
     end
     println("Fail = ", fail)
     metric
@@ -61,11 +61,11 @@ end
     Dem = @yield Customer_process
 
     N_products = 5
-    N_periods = 3
+    N_periods = 4
 
-    m = monolith(Dem,N_products,N_periods)
 
-    for t_index in 1:3
+    for t_index in 1:4
+        m = monolith(Dem, N_products, N_periods)
         println("Dem = ",Dem)
 
         println("\n")
@@ -76,17 +76,18 @@ end
         println("                     ||    ||")
         println("\n");
 
-        Plan_process = @process Planner(sim, Dem, m)
+        Plan_process = @process Planner(sim, m)
         (x, x_sol) = @yield Plan_process
 
         println("Output de Planner = ", x_sol)
 
-        setlowerbound.(x[:,1],1)
+        setlowerbound.(x[:,:],1)
         #if t_index > 1
+
         #    for (i,t) in keys(x)
-        #        println(t_index)
-        #        #setlowerbound(x[i,t_index-1],1)
-        #        #setupperbound(x[i,t_index-1],getvalue(x[i,t-1]))
+        #println(t_index)
+        #setlowerbound.(x[:,t_index],getvalue(x[:,t_index]))
+            #setupperbound(x[:,t_index-1],getvalue(x[i,t-1]))
         #    end
         #end
 
