@@ -5,7 +5,7 @@ using Cbc
 using Distributions
 
 N_products = 5
-N_periods = 5
+N_periods = 4
 
 tic()
 
@@ -49,7 +49,7 @@ include("monolith.jl")
         println("\n");
 
         if t_index == 1
-            println("Dem = ",Dem)
+            #println("Dem = ",Dem)
 
             m = monolith(Dem, N_products, N_periods)
 
@@ -73,10 +73,24 @@ include("monolith.jl")
         else
             #Dem[:,t_index] = rand(d,N_products);
             Dem[:,t_index] = Dem[:,t_index] + 3*rand()
-            println("Dem = ",Dem)
+            #println("Dem = ",Dem)
 
             m = monolith(Dem, N_products, N_periods)
-            x = getindex(m, :x)
+
+            w = getindex(m, :w);
+            Θl = getindex(m, :Θl);
+            xl = getindex(m, :xl);
+            Θ = getindex(m, :Θ);
+            x = getindex(m, :x);
+            z = getindex(m, :z);
+            te = getindex(m, :te);
+            ts = getindex(m, :ts);
+            trt = getindex(m, :trt);
+            inv = getindex(m, :inv);
+            invo = getindex(m, :invo);
+            s = getindex(m, :s);
+            area = getindex(m, :area);
+
 
             for iter in 2:t_index
             setlowerbound.(w[:,:,iter-1],w_pass[t_index-1,:,:,iter-1]);
@@ -109,11 +123,22 @@ include("monolith.jl")
             end
 
             solve(m)
-            x_sol = getvalue(x) #x_sol = Solucion de x
+
+            w_sol = getvalue(w);                w_pass[t_index,:,:,:] = w_sol[:,:,:];
+            Θl_sol = getvalue(Θl);              Θl_pass[t_index,:,:,:] = Θl_sol[:,:,:];
+            xl_sol = getvalue(xl);              xl_pass[t_index,:,:,:] = xl_sol[:,:,:];
+            Θ_sol = getvalue(Θ);                Θ_pass[t_index,:,:] = Θ_sol[:,:];
+            x_sol = getvalue(x);                x_pass[t_index,:,:] = x_sol[:,:];
+            z_sol = getvalue(z);                z_pass[t_index,:,:,:,:] = z_sol[:,:,:,:];
+            te_sol = getvalue(te);              te_pass[t_index,:,:] = te_sol[:,:];
+            ts_sol = getvalue(ts);              ts_pass[t_index,:,:] = ts_sol[:,:];
+            trt_sol = getvalue(trt);            trt_pass[t_index,:,:,:] = trt_sol[:,:,:];
+            inv_sol = getvalue(inv);            inv_pass[t_index,:,:] = inv_sol[:,:];
+            invo_sol = getvalue(invo);          invo_pass[t_index,:,:] = invo_sol[:,:];
+            s_sol = getvalue(s);                s_pass[t_index,:,:] = s_sol[:,:];
+            area_sol = getvalue(area);          area_pass[t_index,:,:] = area_sol[:,:];
 
             println("Output de Planner = ", x_sol)
-
-            x_pass[t_index,:,:] = x_sol[:,:]
         end
     end
     #Aca deberia ir el @process de Proc
