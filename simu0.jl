@@ -70,8 +70,6 @@ include("monolith.jl")
             area = getindex(m, :area);          area_sol = getvalue(area);          area_pass = -1*ones(Float64, N_periods, N_products, N_periods);                     area_pass[1,:,:] = area_sol[:,:];
 
             println("Output de Planner = ", x_sol)
-
-            #println("x_pass = ", x_pass)
         else
             #Dem[:,t_index] = rand(d,N_products);
             Dem[:,t_index] = Dem[:,t_index] + 3*rand()
@@ -116,50 +114,8 @@ include("monolith.jl")
             println("Output de Planner = ", x_sol)
 
             x_pass[t_index,:,:] = x_sol[:,:]
-
-
-
-
-            #DEBO HALLAR LA MANERA DE GUARDAR LAS SOLUCIONES PARA HACER EL
-            #"ROLLING HORIZON"
-
-            #=
-            @show getsolvetime(m)
-
-            (x, x_sol)
-
-            #    for (i,t) in keys(x)
-            #println(t_index)
-            #setlowerbound.(x[:,t_index],getvalue(x[:,t_index]))
-                #setupperbound(x[:,t_index-1],getvalue(x[i,t-1]))
-            #    end
-            #end
-            =#
-
-
-
-
-
-            #=
-            m2 = monolith(Dem,N_products,N_periods)
-            x2 = getindex(m2, :x)
-
-            =#
-
-            #=srand(123)
-            d=Normal(14333.33333,10631.595);
-            Dem1=rand(d,5);
-
-            srand(23)
-            d=Normal(14333.33333,10631.595);
-            Dem2=rand(d,5);Dem3=rand(d,5);Dem4=rand(d,5);
-            Dem=hcat(Dem1,Dem2,Dem3,Dem4)
-
-            println(Dem)
-            =#
         end
     end
-
     #Aca deberia ir el @process de Proc
 end
 
@@ -175,6 +131,9 @@ println(" \\___/  \\___/  |_|  \\___/  |_| |_| |_| |_'__/  |_|  \\__'_|   (_) (_
 println("\n")
 
 toc()
+
+#DEBO HALLAR LA MANERA DE GUARDAR LAS SOLUCIONES PARA HACER EL
+#"ROLLING HORIZON"
 
 #Parametros con incertidumbre
 #τ[i,k] = transition time from product i to product k
