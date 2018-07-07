@@ -7,9 +7,8 @@ function monolith(D,N_products,N_periods)
     products = 1:N_products
     periods = 1:N_periods
     slots = 1:length(products)
-    
+
     m = Model(solver=GurobiSolver(MIPGap=0))
-    m.ext[:products] = products    
 
     @variable(m, w[i in products, l in slots, t in periods], Bin)
     @variable(m, Θl[i in products, l in slots, t in periods] >= 0) # Should be positive
