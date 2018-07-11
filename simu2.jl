@@ -154,7 +154,7 @@ s_pass = -1*ones(Float64, N_periods, N_products, N_periods)
 area_pass = -1*ones(Float64, N_periods, N_products, N_periods)
 
 #3. Se hace un for que recorre cada semana
-function principal(t_index,boo,i_boo,t_boo,ts_boo,te_boo)
+function principal(t_index)
 #for t_index in 1:N_periods
     println("\n")
     println("                 ^__^")
@@ -280,7 +280,7 @@ t_boo = -1
 ts_boo = -1
 te_boo = -1
 
-principal(t_index,boo,i_boo,t_boo,ts_boo,te_boo)
+principal(t_index)
 
 println("\n")
 println("                _                       _       _             _   _   _")
