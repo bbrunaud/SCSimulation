@@ -1,9 +1,9 @@
 using JuMP
 using Gurobi
 
-include("P5T24data1.jl")
+include("P5T24data2.jl")
 
-function monolith(D,N_products,N_periods,INVI)
+function monolith(D,N_products,N_periods)
     products = 1:N_products
     periods = 1:N_periods
     slots = 1:length(products)
