@@ -19,6 +19,7 @@ function monolith(D,N_products,N_periods)
     @variable(m, te[l in slots, t in periods] >= 0)
     @variable(m, ts[l in slots, t in periods] >= 0)
     @variable(m, trt[i in products, k in products, t in periods] >= 0)
+    @variable(m, trt0[i in products, k in products] >= 0)
     @variable(m, inv[i in products, t in periods] >= 0)
     @variable(m, invo[i in products, t in periods] >= 0)
     @variable(m, s[i in products, t in periods], lowerbound=D[i,t])
@@ -47,7 +48,9 @@ function monolith(D,N_products,N_periods)
     # D) Timing Relations
     @constraint(m, eq6[l in slots, t in periods], te[l,t] == ts[l,t] + sum(Θl[i,l,t] for i in products) + sum(τ[i,k]*z[i,k,l,t] for i in products, k in products) )
     @constraint(m, eq7[i in products, k in products, t in periods; t<periods[end] && i!=k], trt[i,k,t] >= w[i,slots[end],t] + w[k,slots[1],t+1] - 1)
+    @constraint(m, eq7b[i in products, k in products; i!=k], trt0[i,k] >= Winit[i] + w[k,slots[1],1] - 1)
     @constraint(m, eq8[t in periods;t<periods[end]], te[slots[end],t] + sum(τ[i,k]*trt[i,k,t] for i in products, k in products) == ts[slots[1],t+1])
+    @constraint(m, eq8b, sum(τ[i,k]*trt0[i,k] for i in products, k in products) == ts[slots[1],1])
     @constraint(m, eq9[l in slots, t in periods;l<slots[end]], te[l,t] == ts[l+1,t])
     @constraint(m, eq10[t in periods], te[slots[end], t] <= HT[t])
 
@@ -68,8 +71,9 @@ function monolith(D,N_products,N_periods)
     @expression(m, opercost, sum(COper[i]*x[i,t] for i in products, t in periods) )
     @expression(m, transslotcost, sum(CTrans[i,k]*z[i,k,l,t] for i in products, k in products, l in slots, t in periods) )
     @expression(m, transperiodcost, sum(CTrans[i,k]*trt[i,k,t] for i in products, k in products,t in periods) )
+    @expression(m, inittransperiodcost, sum(CTrans[i,k]*trt0[i,k] for i in products, k in products) )
 
-    @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost)
+    @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost + inittransperiodcost)
 
     return m
 
