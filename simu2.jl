@@ -280,7 +280,13 @@ t_boo = -1
 ts_boo = -1
 te_boo = -1
 
-principal(t_index)
+#principal(t_index)
+
+Winit = [0 0 0 0 1]
+m = monolith(Dem,N_products,N_periods,Winit)
+solve(m)
+w = getindex(m, :w);                w_sol = getvalue(w);
+println("w = ",w_sol[:,1,1])
 
 println("\n")
 println("                _                       _       _             _   _   _")
