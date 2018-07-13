@@ -3,13 +3,13 @@ using Gurobi
 
 include("P5T24data3.jl")
 
-function monolith(τ,D,R,INVI,Winit,N_products,N_periods)
+function monolith(D,R,INVI,Winit,N_products,N_periods)
     products = 1:N_products
     periods = 1:N_periods
     slots = 1:length(products)
 
     m = Model(solver=GurobiSolver(MIPGap=0,OutputFlag=0))
-    
+
     @variable(m, w[i in products, l in slots, t in periods], Bin)
     @variable(m, Θl[i in products, l in slots, t in periods] >= 0) # Should be positive
     @variable(m, xl[i in products, l in slots, t in periods] >= 0)

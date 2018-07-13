@@ -1,4 +1,3 @@
-#=Esto se define en el archivo principal simu3.jl
 #TABLE TAU(I,K)       TRANSITION TIME FROM PROD I TO K
 τ = [
     0     2     1.5     1       0.75
@@ -7,7 +6,6 @@
     0.5   1      2      0       1.75
     0.7   1.75   2      1.5       0
 ]
-=#
 
 TR = [0.75  0.5  1  0.5  0.7]
 
