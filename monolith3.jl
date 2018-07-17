@@ -11,7 +11,7 @@ function monolith(D,R,INVI,Winit,N_products,N_periods)
     m = Model(solver=GurobiSolver(MIPGap=0,OutputFlag=0))
 
     @variable(m, w[i in products, l in slots, t in periods], Bin)
-    @variable(m, Θl[i in products, l in slots, t in periods] >= 0) # Should be positive
+    @variable(m, Θl[i in products, l in slots, t in periods] >= 0, upperbound=48) # Should be positive
     @variable(m, xl[i in products, l in slots, t in periods] >= 0)
     @variable(m, Θ[i in products, t in periods] >= 0)
     @variable(m, x[i in products, t in periods] >= 0)
