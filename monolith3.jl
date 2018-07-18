@@ -3,12 +3,12 @@ using Gurobi
 
 include("P5T24data3.jl")
 
-function monolith(D,R,INVI,Winit,N_products,N_periods)
+function monolith(D,R,INVI,Winit,N_products,N_periods,x_planner,bool_scheduler)
     products = 1:N_products
     periods = 1:N_periods
     slots = 1:length(products)
 
-    m = Model(solver=GurobiSolver(MIPGap=0,OutputFlag=0))
+    m = Model(solver=GurobiSolver(MIPGap=0,OutputFlag=1))
 
     @variable(m, w[i in products, l in slots, t in periods], Bin)
     @variable(m, Θl[i in products, l in slots, t in periods] >= 0, upperbound=48) # Should be positive
@@ -65,6 +65,7 @@ function monolith(D,R,INVI,Winit,N_products,N_periods)
     #@constraint(m, eq15[i in products, t in periods], s[i,t] >= D[i,t])
     # No need, specified as bound
 
+
     # A) Objective Function
     @expression(m, sales, sum(P[i]*s[i,t] for i in products, t in periods))
     @expression(m, invcost, CInv*sum(area[i,t] for t in periods, i in products) )
@@ -73,11 +74,17 @@ function monolith(D,R,INVI,Winit,N_products,N_periods)
     @expression(m, transperiodcost, sum(CTrans[i,k]*trt[i,k,t] for i in products, k in products,t in periods) )
     @expression(m, inittransperiodcost, sum(CTrans[i,k]*trt0[i,k] for i in products, k in products) )
 
-    @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost - inittransperiodcost)
+    if bool_scheduler == true
+        @variable(m, slack_p[i in products] >= 0)
+        @variable(m, slack_n[i in products] >= 0)
+        @constraint(m, eq_pen[i in products], x[i,1]-x_planner[i] >= slack_p[i]-slack_n[i])
+        @expression(m, penalization, 0*sum(slack_p[i]+slack_n[i] for i in products) )
+        @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost - inittransperiodcost - penalization)
+    else
+        @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost - inittransperiodcost)
+    end
 
     return m
-
-    #objval = 52319.905226666626
 end
 
 #=

@@ -21,6 +21,7 @@ N_periods = 4
 # Optimization model
 include("monolith3.jl")
 
+srand(123)
 # On the main code we define the following parameters because (1) they have
 # uncertainty or (2) they allow communication between simulation agents:
 mutable struct SCSimulationData
@@ -36,13 +37,15 @@ mutable struct SCSimulationData
     backlogs    # Array that counts how many backlogs the process had: (1) week,
                 # (2) product and (3) amount of backlog
     info        # Communication between planner and scheduler
+    x_planner
 end
 function SCSimulationData()
-    Dem = [0.0          10000        20000        0
-            15000        10000        5000        15000
-            20000        30000        40000       20000
-            20000        10000        3000        20000
-            20000        10000        2000        20000]
+    #Dem = [0.0          10000        20000        0
+    #        15000        10000        5000        15000
+    #        20000        30000        40000       20000
+    #        20000        10000        3000        20000
+    #        20000        10000        2000        20000]
+    d_dem = Normal(14333.33333,10631.595);  Dem = rand(d_dem,N_products,N_periods)
     R = [800.0  900  1000 1000 1200]
     INVI = [0.0 for i in 1:N_products]
     Winit = [0 for i in 1:N_products]
@@ -52,8 +55,9 @@ function SCSimulationData()
     sells = -1*ones(N_products)
     backlogs = zeros(3,1)
     info = -1*ones(N_products)
+    x_planner = -1*ones(N_products)
 
-    s = SCSimulationData(Dem,R,INVI,Winit,list,t_index,fail_prod,sells,backlogs,info)
+    s = SCSimulationData(Dem,R,INVI,Winit,list,t_index,fail_prod,sells,backlogs,info,x_planner)
 end
 
 # ------------------------------------------------------------------------------
@@ -61,10 +65,8 @@ end
 #                               Client agent
 # The "client" agent is responsible for generating the demand in each period
 # ------------------------------------------------------------------------------
-srand(123)
 @resumable function client(env::Simulation,sc::SCSimulationData)
     d_dem = Normal(14333.33333,10631.595)
-
     for t in 1:N_periods-1
         sc.Dem[:,t] = sc.Dem[:,t+1]
     end
@@ -94,7 +96,7 @@ srand(123)
 # The "Planner" agent is responsible for optimizing the model every two weeks
 # ------------------------------------------------------------------------------
 @resumable function planner(env::Simulation,sc::SCSimulationData)
-    m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods)
+    m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods,sc.x_planner,false)
     status = solve(m)
 
     tic()
@@ -114,10 +116,9 @@ srand(123)
     # "to_scheduler" function is used to comucate the planner and the scheduler
     planner_scheduler(m,sc)
 
-    w = getindex(m,:w);     w_sol = getvalue(w);
-    x = getindex(m,:x);     x_sol = getvalue(x);
-    Θl = getindex(m,:Θl);   Θl_sol = getvalue(Θl);
-
+    #w = getindex(m,:w);     w_sol = getvalue(w);
+    #x = getindex(m,:x);     x_sol = getvalue(x);
+    #Θl = getindex(m,:Θl);   Θl_sol = getvalue(Θl);
     #println("\n")
     #println("w_sol = $(w_sol[:,:,2])")
     #println("Θl_sol = $(Θl_sol[:,:,2])")
@@ -137,15 +138,15 @@ end
 
     println("The planner says: in week $(sc.t_index) the plant must produce:")
     for i in 1:N_products
-        println("   $(round(sc.info[i],2)) units of $i")
+        println("   $(round(sc.x_planner[i],2)) units of $i")
     end
 
-    m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods)
+    m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods,sc.x_planner,true)
     status = solve(m)
 
-    x = getindex(m,:x)      # x = amount produced of product i in period t
-    setlowerbound.(x[:,1],sc.info[:])
-    setupperbound.(x[:,1],sc.info[:])
+    #x = getindex(m,:x)      # x = amount produced of product i in period t
+    #setlowerbound.(x[:,1],sc.info[:])
+    #setupperbound.(x[:,1],sc.info[:])
 
     tic()
     status = solve(m)
@@ -158,6 +159,13 @@ end
     println("   Optimization problem was solved in $m_time sec")
 
     planner_operator(m,sc)
+
+    slack_n = getindex(m,:slack_n); slack_n_sol = getvalue(slack_n)
+    slack_p = getindex(m,:slack_p); slack_p_sol = getvalue(slack_p)
+
+    println("slack_p_sol = $(slack_p_sol)")
+    println("slack_n_sol = $(slack_n_sol)")
+
 end
 
 # ------------------------------------------------------------------------------
@@ -207,6 +215,7 @@ end
 function planner_scheduler(m::JuMP.Model,sc::SCSimulationData)
     x = getindex(m,:x);    x_sol = getvalue(x)     # x = amount produced of product i in period t
     sc.info[:] = x_sol[:,2]
+    sc.x_planner[:] = x_sol[:,2]
 end
 # ------------------------------------------------------------------------------
 #                                 Section 5
@@ -321,17 +330,17 @@ end
     println("\n")
     println("    /\\_/\\        ")
     println("   (=^.^=)         ")
-    println("    (\")(\")_/     Dispatch agent")
+    println("   (\")_(\")_/     Dispatch agent")
 
     sc.INVI -= sc.sells
 
-    for i in 1:N_products
+    for i in 2:N_products
         if round(sc.INVI[i],2) < 0
             backlog[1,1] = sc.t_index
             backlog[2,1] = i
             backlog[3,1] = -round(sc.INVI[i],2)
 
-            println("   There was a backlog of product $i in week $(sc.t_index) of $(-sc.INVI[i]) units")
+            println("   There was a backlog of product $i in week $(sc.t_index) of $(round(-sc.INVI[i],2)) units")
             sc.backlogs = hcat(sc.backlogs,backlog)
         else
             println("   There was no backlog of product $i in week $(sc.t_index)")
@@ -350,19 +359,32 @@ end
         client_process = @process client(env,sc)
         @yield client_process
 
-        #if isodd(t_ind) == true
+        if isodd(t_ind) == true
             planner_process = @process planner(env,sc)
             @yield planner_process
-        #else
-        #    scheduler_process = @process scheduler(env,sc)
-        #    @yield scheduler_process
-        #end
+        else
+            scheduler_process = @process scheduler(env,sc)
+            @yield scheduler_process
+        end
 
         operator_process = @process operator(env,sc)
         @yield operator_process
 
         dispatch_process = @process dispatch(env,sc)
         @yield dispatch_process
+    end
+    println("\n")
+    println("                _                       _       _             _   _   _")
+    println("  ___    ___   | |   ___    _ __  __   | |_    (_)   __ _    | | | | | |")
+    println(" / __\\  / _ \\  | |  / _ \\  | '_ ''_ '  |  _ \\  | |  / _' |   | | | | | |")
+    println("| (__  | (_) | | | | (_) | | | | | | | | |_) | | | | (_| |   |_| |_| |_|")
+    println(" \\___/  \\___/  |_|  \\___/  |_| |_| |_| |_'__/  |_|  \\__'_|   (_) (_) (_)")
+
+    final = size(sc.backlogs)
+    println("\n")
+    println("The process had $(final[2]-1) backlog(s) in total during the simulation")
+    for ind in 2:final[2]
+        println("   One in week $(round(sc.backlogs[1,ind],2)) of $(round(sc.backlogs[3,ind],2)) units of product $(round(sc.backlogs[2,ind],2))")
     end
 end
 
@@ -373,19 +395,29 @@ sim = Simulation()
 run(sim)
 
 println("\n")
-println("                   _                       _       _             _   _   _")
-println("     ___    ___   | |   ___    _ __  __   | |_    (_)   __ _    | | | | | |")
-println("    / __\\  / _ \\  | |  / _ \\  | '_ ''_ '  |  _ \\  | |  / _' |   | | | | | |")
-println("   | (__  | (_) | | | | (_) | | | | | | | | |_) | | | | (_| |   |_| |_| |_|")
-println("    \\___/  \\___/  |_|  \\___/  |_| |_| |_| |_'__/  |_|  \\__'_|   (_) (_) (_)")
-
-println("\n")
 toc()
 
 # ------------------------------------------------------------------------------
 #                                    End
 # ------------------------------------------------------------------------------
 
-# Que tanto deberia ser el cambio en el rendimiento (representado en horas de produccion)
-# Las decisiones del planner son instantaneas, eso es realista, cierto?
-# El modelo da infactible cuando intento fijar las decisiones del planner entre semanas
+# Cuantificar bien los blacklogs (cuantos son y que tan grandes fueron) y asi tener una metrica mejor
+
+# Idea de como simular las fallas con distribucion exponencial:
+#lambda = 1.2                    # Constant probability per hour to get a failure
+#d_fail = Exponential(1/lambda)  # Exponential distribution
+#t_fail = rand(d_fail)           # Random failure time: time in which a failure will occur
+#if now(sim) >= t_fail
+#    # The process had a failure
+#else
+#    # The process did not have a failure
+#end
+# Despues se puede crear una variable con distribucion normal que calcule cuanto
+# duro la falla y agregar eso al tiempo de simulacion
+
+# Creo que: si existe algun problema en el proceso (que no alcanzo el tiempo o
+# que hubo una falla en una maquina), el proceso deberia producir hasta donde
+# pueda.
+# Por ejemplo, si no se tiene el tiempo suficiente,entonces la actividad no se
+# lleva a cabo para nada, pero creo que se deberia llevar a cabo hasta donde sea
+# posible
