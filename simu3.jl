@@ -15,8 +15,9 @@ using Distributions
 #                                 Section 1
 #                         Data, Parameters and Model
 # ------------------------------------------------------------------------------
-N_products = 5
-N_periods = 4
+N_weeks = 1
+N_products = 3
+N_periods = 4*N_weeks
 
 # Optimization model
 include("monolith3.jl")
@@ -38,6 +39,7 @@ mutable struct SCSimulationData
                 # (2) product and (3) amount of backlog
     info        # Communication between planner and scheduler
     x_planner
+    fail_time   # Falla de maquina
 end
 function SCSimulationData()
     #Dem = [0.0          10000        20000        0
@@ -56,8 +58,9 @@ function SCSimulationData()
     backlogs = zeros(3,1)
     info = -1*ones(N_products)
     x_planner = -1*ones(N_products)
+    fail_time = [0,0]
 
-    s = SCSimulationData(Dem,R,INVI,Winit,list,t_index,fail_prod,sells,backlogs,info,x_planner)
+    s = SCSimulationData(Dem,R,INVI,Winit,list,t_index,fail_prod,sells,backlogs,info,x_planner,fail_time)
 end
 
 # ------------------------------------------------------------------------------
@@ -82,13 +85,16 @@ end
     end
 
     println("\n")
-    println("-------------------------------------- Week #$(sc.t_index) ----------------------------------------")
-    println("    ^__^               ")
+
+    println("    ^__^               Client agent")
     println("    (oo)\\______       ")
     println("   (__)\\       )\\/\\ ")
     println("        ||---- |       ")
-    println("        ||    ||       Client agent")
+    println("        ||    ||       The demand of week $(sc.t_index) is: ")
+    for i in 1:N_products
+        println("                       $(round(sc.Dem[i,sc.t_index],2)) units of $i")
     end
+end
 
 # ------------------------------------------------------------------------------
 #                                Section 3.1
@@ -104,9 +110,9 @@ end
     m_time = toc()
 
     println("\n")
-    println("   (\\ _ /)      Solve status was $status")
+    println("   (\\ _ /)       Planner agent")
     println("   ( 'x' )         ")
-    println("   c(\")(\")       Planner agent")
+    println("   c(\")(\")     Solve status was $status")
     println("   Optimization problem was solved in $m_time sec")
 
     # "to_operator" function is used to "transform" the optimization solution
@@ -144,27 +150,22 @@ end
     m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods,sc.x_planner,true)
     status = solve(m)
 
-    #x = getindex(m,:x)      # x = amount produced of product i in period t
-    #setlowerbound.(x[:,1],sc.info[:])
-    #setupperbound.(x[:,1],sc.info[:])
-
     tic()
     status = solve(m)
     m_time = toc()
 
     println("\n")
-    println("   (\\ _ /)      Solve status was $status")
+    println("   (\\ _ /)       Scheduler agent")
     println("   ( 'x' )         ")
-    println("   c(\")(\")       Planner agent")
+    println("   c(\")(\")     Solve status was $status")
     println("   Optimization problem was solved in $m_time sec")
 
     planner_operator(m,sc)
 
-    slack_n = getindex(m,:slack_n); slack_n_sol = getvalue(slack_n)
-    slack_p = getindex(m,:slack_p); slack_p_sol = getvalue(slack_p)
-
-    println("slack_p_sol = $(slack_p_sol)")
-    println("slack_n_sol = $(slack_n_sol)")
+    #slack_n = getindex(m,:slack_n); slack_n_sol = getvalue(slack_n)
+    #slack_p = getindex(m,:slack_p); slack_p_sol = getvalue(slack_p)
+    #println("slack_p_sol = $(slack_p_sol)")
+    #println("slack_n_sol = $(slack_n_sol)")
 
 end
 
@@ -217,6 +218,23 @@ function planner_scheduler(m::JuMP.Model,sc::SCSimulationData)
     sc.info[:] = x_sol[:,2]
     sc.x_planner[:] = x_sol[:,2]
 end
+
+# ------------------------------------------------------------------------------
+#                                Section 4.3
+#                             Failure function
+# This function is used to create a failure time for the process
+# ------------------------------------------------------------------------------
+function fail_machine(t_ini::Number)
+    lambda = 168                    # Constant probability per hour to get a failure
+    d_fail = Exponential(lambda)    # Exponential distribution
+    t_fail = t_ini+rand(d_fail)           # Random failure time: time in which a failure will occur
+
+    d_fail2 = Normal(2,0.5)    # Exponential distribution
+    t_fail2 = rand(d_fail2)
+
+    (t_fail,t_fail2)
+end
+
 # ------------------------------------------------------------------------------
 #                                 Section 5
 #                              Operator agent
@@ -226,10 +244,12 @@ end
 @resumable function operator(env::Simulation,sc::SCSimulationData)
     # Reset of timeout to count between 0 and 168 each week
     @yield timeout(env,-now(sim))
+    @yield timeout(env,(sc.t_index-1)*168.0)
 
     # cond is a boolean variable that is false only when the simulation time is
     # more than 168
     cond = true
+    t_failu = 0
 
     for l in 1:N_products
         # fail_new is an array that describes the process failures
@@ -255,9 +275,6 @@ end
                 prod_t_alea = xl/R_alea
                 println("       The theoretical production time was of $(round(prod_t,2)) hr, but it was of $(round(prod_t_alea,2)) hr")
                 prod_t = prod_t_alea
-
-                println("       R antes = $(sc.R[convert(Int64,i_ind)])")
-                println("       R despues = $(R_alea)")
             else
                 println("       Product $(i_ind) did not have any production time in slot $l")
             end
@@ -275,9 +292,25 @@ end
             end
 
             @yield timeout(env,prod_t+trans_t)
+            #println("       Time of slot $l in week $(sc.t_index) = ",now(sim))
+
+            # Uncertainty of transition failure: If there was a failure, then
+            # the a failure time is going to be added to the total time
+            if now(sim) >= sc.fail_time[1]
+                # The process had a failure
+                println("---------->There was a failure of $(round(sc.fail_time[2],2)) hours in slot $l of week $(sc.t_index)")
+                @yield timeout(env,sc.fail_time[2])
+
+                # Set up the new failure time
+                sc.fail_time = fail_machine(now(sim))
+            else
+                # The process did not have a failure
+                println("           There was no failure during slot $l of week $(sc.t_index)")
+            end
+
             println("       Time of slot $l in week $(sc.t_index) = ",now(sim))
 
-            if round(now(sim),1) <= 168.0
+            if round(now(sim),1) <= 168.0*(sc.t_index)
                 # Update of the inventory because there was production time
                 if prod_t > 0
                     sc.INVI[convert(Int64,i_ind)] += xl
@@ -291,14 +324,14 @@ end
             else
                 # If the remaining time of week t_index is not enough to complete
                 # the task in slot l, then that task will not be carry out
-                t_delay = round(now(sim),1)-168.0
+                t_delay = round(now(sim),1)-168.0*(sc.t_index)
 
                 println("\n")
                 println("   The remaining time of week $(sc.t_index) is not enough to complete the task in slot $l")
-                println("   $(6-l) job(s) could not be done completely in week $(sc.t_index)!!!")
+                println("   $(N_products+1-l) job(s) could not be done completely in week $(sc.t_index) (including the slot $l)")
 
                 # Update of the "fail list"
-                if (6-l) >= 2
+                if (N_products+1-l) >= 2
                     for l_ind in l:N_products
                         fail_new[1,1] = sc.t_index
                         fail_new[2,1] = l_ind
@@ -332,9 +365,11 @@ end
     println("   (=^.^=)         ")
     println("   (\")_(\")_/     Dispatch agent")
 
+    println("sc.INVI = $(sc.INVI)")
+    println("sc.selss = $(sc.sells)")
     sc.INVI -= sc.sells
 
-    for i in 2:N_products
+    for i in 1:N_products
         if round(sc.INVI[i],2) < 0
             backlog[1,1] = sc.t_index
             backlog[2,1] = i
@@ -353,8 +388,12 @@ end
 #                             Main simulation
 # ------------------------------------------------------------------------------
 @resumable function start_sim(env::Simulation,sc::SCSimulationData)
+    # Set up the first failure time
+    sc.fail_time = fail_machine(0)
+
     for t_ind in 1:N_periods
         sc.t_index = t_ind
+        println("-------------------------------------- Week #$(sc.t_index) ----------------------------------------")
 
         client_process = @process client(env,sc)
         @yield client_process
@@ -402,18 +441,6 @@ toc()
 # ------------------------------------------------------------------------------
 
 # Cuantificar bien los blacklogs (cuantos son y que tan grandes fueron) y asi tener una metrica mejor
-
-# Idea de como simular las fallas con distribucion exponencial:
-#lambda = 1.2                    # Constant probability per hour to get a failure
-#d_fail = Exponential(1/lambda)  # Exponential distribution
-#t_fail = rand(d_fail)           # Random failure time: time in which a failure will occur
-#if now(sim) >= t_fail
-#    # The process had a failure
-#else
-#    # The process did not have a failure
-#end
-# Despues se puede crear una variable con distribucion normal que calcule cuanto
-# duro la falla y agregar eso al tiempo de simulacion
 
 # Creo que: si existe algun problema en el proceso (que no alcanzo el tiempo o
 # que hubo una falla en una maquina), el proceso deberia producir hasta donde

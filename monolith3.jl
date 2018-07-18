@@ -8,10 +8,10 @@ function monolith(D,R,INVI,Winit,N_products,N_periods,x_planner,bool_scheduler)
     periods = 1:N_periods
     slots = 1:length(products)
 
-    m = Model(solver=GurobiSolver(MIPGap=0,OutputFlag=1))
+    m = Model(solver=GurobiSolver(MIPGap=0,OutputFlag=0))
 
     @variable(m, w[i in products, l in slots, t in periods], Bin)
-    @variable(m, Θl[i in products, l in slots, t in periods] >= 0, upperbound=48) # Should be positive
+    @variable(m, Θl[i in products, l in slots, t in periods] >= 0, upperbound=120) # Should be positive
     @variable(m, xl[i in products, l in slots, t in periods] >= 0)
     @variable(m, Θ[i in products, t in periods] >= 0)
     @variable(m, x[i in products, t in periods] >= 0)
@@ -78,7 +78,7 @@ function monolith(D,R,INVI,Winit,N_products,N_periods,x_planner,bool_scheduler)
         @variable(m, slack_p[i in products] >= 0)
         @variable(m, slack_n[i in products] >= 0)
         @constraint(m, eq_pen[i in products], x[i,1]-x_planner[i] >= slack_p[i]-slack_n[i])
-        @expression(m, penalization, 0*sum(slack_p[i]+slack_n[i] for i in products) )
+        @expression(m, penalization, 1e5*sum(slack_p[i]+slack_n[i] for i in products) )
         @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost - inittransperiodcost - penalization)
     else
         @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost - inittransperiodcost)
