@@ -8,10 +8,10 @@ function monolith(D,R,INVI,Winit,N_products,N_periods,x_planner,bool_scheduler)
     periods = 1:N_periods
     slots = 1:length(products)
 
-    m = Model(solver=GurobiSolver(MIPGap=0,OutputFlag=0))
+    m = Model(solver=GurobiSolver(MIPGap=0,OutputFlag=1))
 
     @variable(m, w[i in products, l in slots, t in periods], Bin)
-    @variable(m, Θl[i in products, l in slots, t in periods] >= 0, upperbound=120) # Should be positive
+    @variable(m, Θl[i in products, l in slots, t in periods] >= 0, upperbound=168) # Should be positive
     @variable(m, xl[i in products, l in slots, t in periods] >= 0)
     @variable(m, Θ[i in products, t in periods] >= 0)
     @variable(m, x[i in products, t in periods] >= 0)

@@ -1,6 +1,7 @@
 # x=============================================================================
-# In case that this is used to simulate another model different of monolith3.jl,
-# the programmer should look at:
+# In case that this code is used to simulate another model different of
+# monolith3.jl, the programmer should look at:
+# - "Section 1": change the parameters and data of the problem
 # - "Section 4": change the "transformation" funtion
 # - "Section 5":
 # x=============================================================================
@@ -15,9 +16,9 @@ using Distributions
 #                                 Section 1
 #                         Data, Parameters and Model
 # ------------------------------------------------------------------------------
-N_weeks = 1
-N_products = 3
-N_periods = 4*N_weeks
+N_months = 2
+N_products = 5
+N_periods = 4*N_months
 
 # Optimization model
 include("monolith3.jl")
@@ -107,13 +108,13 @@ end
 
     tic()
     status = solve(m)
-    m_time = toc()
+    m_time = toq()
 
     println("\n")
-    println("   (\\ _ /)       Planner agent")
+    println("   (\\ _ /)         Planner agent")
     println("   ( 'x' )         ")
-    println("   c(\")(\")     Solve status was $status")
-    println("   Optimization problem was solved in $m_time sec")
+    println("   c(\")(\")         Solve status was $status")
+    println("                   Optimization problem was solved in $m_time sec")
 
     # "to_operator" function is used to "transform" the optimization solution
     # into a list of works that the operator should understand and carry out
@@ -121,14 +122,6 @@ end
 
     # "to_scheduler" function is used to comucate the planner and the scheduler
     planner_scheduler(m,sc)
-
-    #w = getindex(m,:w);     w_sol = getvalue(w);
-    #x = getindex(m,:x);     x_sol = getvalue(x);
-    #Θl = getindex(m,:Θl);   Θl_sol = getvalue(Θl);
-    #println("\n")
-    #println("w_sol = $(w_sol[:,:,2])")
-    #println("Θl_sol = $(Θl_sol[:,:,2])")
-    #println("x_sol = $(x_sol[:,2])")
 end
 
 # ------------------------------------------------------------------------------
@@ -137,12 +130,10 @@ end
 # ------------------------------------------------------------------------------
 @resumable function scheduler(env::Simulation,sc::SCSimulationData)
     println("\n")
-    println("   _[_]_   ")
-    println("   (o,o)   ")
-    println("   ( : )   ")
-    println("   ( : )   Communication planner/scheduler")
-
-    println("The planner says: in week $(sc.t_index) the plant must produce:")
+    println("   _[_]_       Planner to Scheduler")
+    println("   (o,o)       ")
+    println("   ( : )       ")
+    println("   ( : )       The planner wants the following for week $(sc.t_index):")
     for i in 1:N_products
         println("   $(round(sc.x_planner[i],2)) units of $i")
     end
@@ -152,21 +143,29 @@ end
 
     tic()
     status = solve(m)
-    m_time = toc()
+    m_time = toq()
 
     println("\n")
-    println("   (\\ _ /)       Scheduler agent")
+    println("   (\\ _ /)         Scheduler agent")
     println("   ( 'x' )         ")
-    println("   c(\")(\")     Solve status was $status")
-    println("   Optimization problem was solved in $m_time sec")
+    println("   c(\")(\")         Solve status was $status")
+    println("                   Optimization problem was solved in $m_time sec")
 
     planner_operator(m,sc)
 
-    #slack_n = getindex(m,:slack_n); slack_n_sol = getvalue(slack_n)
-    #slack_p = getindex(m,:slack_p); slack_p_sol = getvalue(slack_p)
-    #println("slack_p_sol = $(slack_p_sol)")
-    #println("slack_n_sol = $(slack_n_sol)")
+    slack_n = getindex(m,:slack_n); slack_n_sol = getvalue(slack_n)
+    slack_p = getindex(m,:slack_p); slack_p_sol = getvalue(slack_p)
 
+    cond = true
+    for i in 1:N_products
+        if slack_n_sol[i] > 0 || slack_p_sol[i] > 0
+            println("   The Scheduler did not fully comply with the Planner's decisions for Product $i production")
+            cond = false
+        end
+    end
+    if cond == true
+        println("   The Scheduler fully complied with the Planner's decisions for all products")
+    end
 end
 
 # ------------------------------------------------------------------------------
@@ -232,6 +231,8 @@ function fail_machine(t_ini::Number)
     d_fail2 = Normal(2,0.5)    # Exponential distribution
     t_fail2 = rand(d_fail2)
 
+    println("---------->Next failure will happen in $t_fail")
+
     (t_fail,t_fail2)
 end
 
@@ -265,7 +266,7 @@ end
 
         if cond == true
             println("\n")
-            println("The process worked with Product $(i_ind) in slot $l of week $(sc.t_index)")
+            println("Product $(i_ind) was assigned to slot $l of week $(sc.t_index)")
 
             # Uncertainty of production rate: Normal distribution
             # The uncertainty should only be applied if there is any production time
@@ -297,20 +298,21 @@ end
             # Uncertainty of transition failure: If there was a failure, then
             # the a failure time is going to be added to the total time
             if now(sim) >= sc.fail_time[1]
-                # The process had a failure
-                println("---------->There was a failure of $(round(sc.fail_time[2],2)) hours in slot $l of week $(sc.t_index)")
-                @yield timeout(env,sc.fail_time[2])
-
                 # Set up the new failure time
                 sc.fail_time = fail_machine(now(sim))
+
+                # The process had a failure
+                println("---------->There was a failure of $(round(sc.fail_time[2],2)) hours in slot $l of week $(sc.t_index)")
+                println("           Next failure will happen in $(round(sc.fail_time[1],2))")
+                @yield timeout(env,sc.fail_time[2])
             else
                 # The process did not have a failure
                 println("           There was no failure during slot $l of week $(sc.t_index)")
             end
 
-            println("       Time of slot $l in week $(sc.t_index) = ",now(sim))
-
             if round(now(sim),1) <= 168.0*(sc.t_index)
+                println("       Time of slot $l in week $(sc.t_index) = ",now(sim))
+
                 # Update of the inventory because there was production time
                 if prod_t > 0
                     sc.INVI[convert(Int64,i_ind)] += xl
@@ -326,9 +328,14 @@ end
                 # the task in slot l, then that task will not be carry out
                 t_delay = round(now(sim),1)-168.0*(sc.t_index)
 
+                println("       The remaining time of week $(sc.t_index) is not enough to complete the task in slot $l")
+
                 println("\n")
-                println("   The remaining time of week $(sc.t_index) is not enough to complete the task in slot $l")
-                println("   $(N_products+1-l) job(s) could not be done completely in week $(sc.t_index) (including the slot $l)")
+                println("   $(N_products+1-l) job(s) could not be done completely in week $(sc.t_index)")
+                print("   The lost job(s) were: ")
+                for inti in l:N_products
+                    print("$inti, ")
+                end
 
                 # Update of the "fail list"
                 if (N_products+1-l) >= 2
@@ -365,8 +372,6 @@ end
     println("   (=^.^=)         ")
     println("   (\")_(\")_/     Dispatch agent")
 
-    println("sc.INVI = $(sc.INVI)")
-    println("sc.selss = $(sc.sells)")
     sc.INVI -= sc.sells
 
     for i in 1:N_products
@@ -378,7 +383,7 @@ end
             println("   There was a backlog of product $i in week $(sc.t_index) of $(round(-sc.INVI[i],2)) units")
             sc.backlogs = hcat(sc.backlogs,backlog)
         else
-            println("   There was no backlog of product $i in week $(sc.t_index)")
+            println("   No backlog of product $i in week $(sc.t_index)")
         end
     end
 end
@@ -393,6 +398,8 @@ end
 
     for t_ind in 1:N_periods
         sc.t_index = t_ind
+
+        println("\n")
         println("-------------------------------------- Week #$(sc.t_index) ----------------------------------------")
 
         client_process = @process client(env,sc)
@@ -434,7 +441,7 @@ sim = Simulation()
 run(sim)
 
 println("\n")
-toc()
+toq()
 
 # ------------------------------------------------------------------------------
 #                                    End
