@@ -22,8 +22,8 @@ N_periods = 4
 # Optimization model
 include("monolith3.jl")
 
-srand(123)
-montecarlo = 123
+montecarlo = 778
+srand(montecarlo)
 
 # On the main code we define the following parameters because (1) they have
 # uncertainty or (2) they allow communication between simulation agents:
@@ -42,7 +42,7 @@ mutable struct SCSimulationData
     info        # Communication between planner and scheduler
     x_planner
     fail_time   # Falla de maquina
-    alea
+    i_sim
 end
 function SCSimulationData()
     #Dem = [0.0          10000        20000        0
@@ -63,8 +63,9 @@ function SCSimulationData()
     info = -1*ones(N_products)
     x_planner = -1*ones(N_products)
     fail_time = [0,0]
-    alea = 123
-    s = SCSimulationData(Dem,R,INVI,Winit,list,t_index,fail_prod,sells,backlogs,info,x_planner,fail_time,alea)
+    i_sim = 0
+
+    s = SCSimulationData(Dem,R,INVI,Winit,list,t_index,fail_prod,sells,backlogs,info,x_planner,fail_time,i_sim)
 end
 
 # ------------------------------------------------------------------------------
@@ -403,7 +404,7 @@ end
         sc.t_index = t_ind
 
         println("\n")
-        println("-------------------------------------- Week #$(sc.t_index) of Simulation #$(sc.alea) ----------------------------------------")
+        println("-------------------------------------- Week #$(sc.t_index) of Simulation #$(sc.i_sim) ----------------------------------------")
 
         client_process = @process client(env,sc)
         @yield client_process
@@ -437,7 +438,15 @@ end
     end
 end
 
+compl_time = toq()
+println("\n")
+println("Compilation time ======= $compl_time")
+
+simu_time = [0.0]
+
 for i in 1:2
+    tic()
+
     println("\n")
     println("Parameter for srand = $montecarlo")
 
@@ -445,15 +454,25 @@ for i in 1:2
     sim = Simulation()
     @process start_sim(sim,sc)
 
-    sc.alea = i
+    sc.i_sim = i
     run(sim)
 
     montecarlo = convert(Int,round(1000*rand(),0))
     srand(montecarlo)
+
+    tim = convert(Float64,toq())
+
+    println("tim = $tim")
+
+    simu_time = push!(simu_time,tim)
+
+    println("tim = $tim")
+
+    println("Solution time for simulation #$(sc.i_sim) = $tim")
+    println("Solution time for simulation #$(sc.i_sim) = $(simu_time[i+1])")
 end
 
 println("\n")
-toc()
 
 # ------------------------------------------------------------------------------
 #                                    End
