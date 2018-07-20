@@ -23,7 +23,7 @@ N_periods = 4
 include("monolith3.jl")
 
 srand(123)
-a = 123
+montecarlo = 123
 
 # On the main code we define the following parameters because (1) they have
 # uncertainty or (2) they allow communication between simulation agents:
@@ -247,7 +247,7 @@ end
 # ------------------------------------------------------------------------------
 @resumable function operator(env::Simulation,sc::SCSimulationData)
     # Reset of timeout to count between 0 and 168 each week
-    @yield timeout(env,-now(sim))
+    @yield timeout(env,-now(env))
     @yield timeout(env,(sc.t_index-1)*168.0)
 
     # cond is a boolean variable that is false only when the simulation time is
@@ -300,9 +300,9 @@ end
 
             # Uncertainty of transition failure: If there was a failure, then
             # the a failure time is going to be added to the total time
-            if now(sim) >= sc.fail_time[1]
+            if now(env) >= sc.fail_time[1]
                 # Set up the new failure time
-                sc.fail_time = fail_machine(now(sim))
+                sc.fail_time = fail_machine(now(env))
 
                 # The process had a failure
                 println("---------->There was a failure of $(round(sc.fail_time[2],2)) hours in slot $l of week $(sc.t_index)")
@@ -313,8 +313,8 @@ end
                 println("           There was no failure during slot $l of week $(sc.t_index)")
             end
 
-            if round(now(sim),1) <= 168.0*(sc.t_index)
-                println("       Time of slot $l in week $(sc.t_index) = ",now(sim))
+            if round(now(env),1) <= 168.0*(sc.t_index)
+                println("       Time of slot $l in week $(sc.t_index) = ",now(env))
 
                 # Update of the inventory because there was production time
                 if prod_t > 0
@@ -329,7 +329,7 @@ end
             else
                 # If the remaining time of week t_index is not enough to complete
                 # the task in slot l, then that task will not be carry out
-                t_delay = round(now(sim),1)-168.0*(sc.t_index)
+                t_delay = round(now(env),1)-168.0*(sc.t_index)
 
                 println("       The remaining time of week $(sc.t_index) is not enough to complete the task in slot $l")
 
@@ -437,15 +437,19 @@ end
     end
 end
 
-for i in 1:5
+for i in 1:2
+    println("\n")
+    println("Parameter for srand = $montecarlo")
+
     sc = SCSimulationData()
     sim = Simulation()
     @process start_sim(sim,sc)
 
     sc.alea = i
     run(sim)
-    a *= 2
-    srand(a)
+
+    montecarlo = convert(Int,round(1000*rand(),0))
+    srand(montecarlo)
 end
 
 println("\n")
