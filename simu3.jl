@@ -16,14 +16,15 @@ using Distributions
 #                                 Section 1
 #                         Data, Parameters and Model
 # ------------------------------------------------------------------------------
-N_months = 2
 N_products = 5
-N_periods = 4*N_months
+N_periods = 4
 
 # Optimization model
 include("monolith3.jl")
 
 srand(123)
+a = 123
+
 # On the main code we define the following parameters because (1) they have
 # uncertainty or (2) they allow communication between simulation agents:
 mutable struct SCSimulationData
@@ -41,6 +42,7 @@ mutable struct SCSimulationData
     info        # Communication between planner and scheduler
     x_planner
     fail_time   # Falla de maquina
+    alea
 end
 function SCSimulationData()
     #Dem = [0.0          10000        20000        0
@@ -48,6 +50,7 @@ function SCSimulationData()
     #        20000        30000        40000       20000
     #        20000        10000        3000        20000
     #        20000        10000        2000        20000]
+    #d_dem = Normal(14333.33333,10631.595);  Dem = rand(d_dem,N_products,N_periods)
     d_dem = Normal(14333.33333,10631.595);  Dem = rand(d_dem,N_products,N_periods)
     R = [800.0  900  1000 1000 1200]
     INVI = [0.0 for i in 1:N_products]
@@ -60,8 +63,8 @@ function SCSimulationData()
     info = -1*ones(N_products)
     x_planner = -1*ones(N_products)
     fail_time = [0,0]
-
-    s = SCSimulationData(Dem,R,INVI,Winit,list,t_index,fail_prod,sells,backlogs,info,x_planner,fail_time)
+    alea = 123
+    s = SCSimulationData(Dem,R,INVI,Winit,list,t_index,fail_prod,sells,backlogs,info,x_planner,fail_time,alea)
 end
 
 # ------------------------------------------------------------------------------
@@ -71,7 +74,8 @@ end
 # ------------------------------------------------------------------------------
 @resumable function client(env::Simulation,sc::SCSimulationData)
     d_dem = Normal(14333.33333,10631.595)
-    for t in 1:N_periods-1
+    tam = size(sc.Dem)
+    for t in 1:tam[2]-1
         sc.Dem[:,t] = sc.Dem[:,t+1]
     end
     sc.Dem[:,end] = rand(d_dem,N_products)
@@ -104,7 +108,6 @@ end
 # ------------------------------------------------------------------------------
 @resumable function planner(env::Simulation,sc::SCSimulationData)
     m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods,sc.x_planner,false)
-    status = solve(m)
 
     tic()
     status = solve(m)
@@ -139,7 +142,6 @@ end
     end
 
     m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods,sc.x_planner,true)
-    status = solve(m)
 
     tic()
     status = solve(m)
@@ -231,6 +233,7 @@ function fail_machine(t_ini::Number)
     d_fail2 = Normal(2,0.5)    # Exponential distribution
     t_fail2 = rand(d_fail2)
 
+    println("\n")
     println("---------->Next failure will happen in $t_fail")
 
     (t_fail,t_fail2)
@@ -400,7 +403,7 @@ end
         sc.t_index = t_ind
 
         println("\n")
-        println("-------------------------------------- Week #$(sc.t_index) ----------------------------------------")
+        println("-------------------------------------- Week #$(sc.t_index) of Simulation #$(sc.alea) ----------------------------------------")
 
         client_process = @process client(env,sc)
         @yield client_process
@@ -434,14 +437,19 @@ end
     end
 end
 
-s = SCSimulationData()
-sim = Simulation()
-@process start_sim(sim,s)
+for i in 1:5
+    sc = SCSimulationData()
+    sim = Simulation()
+    @process start_sim(sim,sc)
 
-run(sim)
+    sc.alea = i
+    run(sim)
+    a *= 2
+    srand(a)
+end
 
 println("\n")
-toq()
+toc()
 
 # ------------------------------------------------------------------------------
 #                                    End
@@ -449,9 +457,8 @@ toq()
 
 # Cuantificar bien los blacklogs (cuantos son y que tan grandes fueron) y asi tener una metrica mejor
 
-# Creo que: si existe algun problema en el proceso (que no alcanzo el tiempo o
-# que hubo una falla en una maquina), el proceso deberia producir hasta donde
-# pueda.
+# Creo que: si existe algun problema en el proceso (no alcanzo el tiempo o hubo
+# una falla en una maquina), el proceso deberia producir hasta donde pueda.
 # Por ejemplo, si no se tiene el tiempo suficiente,entonces la actividad no se
 # lleva a cabo para nada, pero creo que se deberia llevar a cabo hasta donde sea
 # posible
