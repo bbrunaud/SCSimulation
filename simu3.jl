@@ -455,10 +455,11 @@ toc()
 #                                    End
 # ------------------------------------------------------------------------------
 
-# Cuantificar bien los blacklogs (cuantos son y que tan grandes fueron) y asi tener una metrica mejor
-
 # Creo que: si existe algun problema en el proceso (no alcanzo el tiempo o hubo
 # una falla en una maquina), el proceso deberia producir hasta donde pueda.
 # Por ejemplo, si no se tiene el tiempo suficiente,entonces la actividad no se
 # lleva a cabo para nada, pero creo que se deberia llevar a cabo hasta donde sea
 # posible
+
+# Debo encontrar la manera de crear archivos .txt para guardar los resultados
+# de las simulaciones
