@@ -17,7 +17,8 @@ using Distributions
 #                         Data, Parameters and Model
 # ------------------------------------------------------------------------------
 N_products = 5
-N_periods = 4
+N_periods_opti = 4      # Horizonte de planeacion
+N_periods_simu = 5      # Horizonte de simulacion
 
 # Optimization model
 include("monolith3.jl")
@@ -50,8 +51,8 @@ function SCSimulationData()
     #        20000        30000        40000       20000
     #        20000        10000        3000        20000
     #        20000        10000        2000        20000]
-    #d_dem = Normal(14333.33333,10631.595);  Dem = rand(d_dem,N_products,N_periods)
-    d_dem = Normal(14333.33333,10631.595);  Dem = rand(d_dem,N_products,N_periods)
+    #d_dem = Normal(14333.33333,10631.595);  Dem = rand(d_dem,N_products,N_periods_opti)
+    d_dem = Normal(14333.33333,10631.595);  Dem = rand(d_dem,N_products,N_periods_opti)
     R = [800.0  900  1000 1000 1200]
     INVI = [0.0 for i in 1:N_products]
     Winit = [0 for i in 1:N_products]
@@ -83,7 +84,7 @@ end
 
     # None of the generated numbers should be negative
     for i in 1:N_products
-        for t in 1:N_periods
+        for t in 1:N_periods_opti
             if sc.Dem[i,t] < 0
                 sc.Dem[i,t] = -sc.Dem[i,t]
             end
@@ -98,7 +99,7 @@ end
     println("        ||---- |       ")
     println("        ||    ||       The demand of week $(sc.t_index) is: ")
     for i in 1:N_products
-        println("                       $(round(sc.Dem[i,sc.t_index],2)) units of $i")
+        println("                       $(round(sc.Dem[i,1],2)) units of $i")
     end
 end
 
@@ -108,7 +109,7 @@ end
 # The "Planner" agent is responsible for optimizing the model every two weeks
 # ------------------------------------------------------------------------------
 @resumable function planner(env::Simulation,sc::SCSimulationData)
-    m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods,sc.x_planner,false)
+    m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods_opti,sc.x_planner,false)
 
     tic()
     status = solve(m)
@@ -142,7 +143,7 @@ end
         println("   $(round(sc.x_planner[i],2)) units of $i")
     end
 
-    m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods,sc.x_planner,true)
+    m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods_opti,sc.x_planner,true)
 
     tic()
     status = solve(m)
@@ -299,7 +300,7 @@ end
             @yield timeout(env,prod_t+trans_t)
             #println("       Time of slot $l in week $(sc.t_index) = ",now(sim))
 
-            # Uncertainty of transition failure: If there was a failure, then
+            # Uncertainty of failure: If there was a failure, then
             # the a failure time is going to be added to the total time
             if now(env) >= sc.fail_time[1]
                 # Set up the new failure time
@@ -400,7 +401,7 @@ end
     # Set up the first failure time
     sc.fail_time = fail_machine(0)
 
-    for t_ind in 1:N_periods
+    for t_ind in 1:N_periods_simu
         sc.t_index = t_ind
 
         println("\n")
@@ -444,7 +445,7 @@ println("Compilation time ======= $compl_time")
 
 simu_time = [0.0]
 
-for i in 1:2
+for i in 1:1
     tic()
 
     println("\n")
@@ -457,7 +458,8 @@ for i in 1:2
     sc.i_sim = i
     run(sim)
 
-    montecarlo = convert(Int,round(1000*rand(),0))
+    #montecarlo = convert(Int,round(1000*rand(),0))
+    montecarlo = i
     srand(montecarlo)
 
     tim = convert(Float64,toq())
@@ -486,3 +488,12 @@ println("\n")
 
 # Debo encontrar la manera de crear archivos .txt para guardar los resultados
 # de las simulaciones
+
+# tener en cuenta el Profit como una variable de respuesta de la simulacion
+
+# Contar el numero de fallas (no como si fuera una variable de respuesta, sino
+# para poder analizar mejor los resultados)
+
+#https://www.google.com/search?q=how+to+generate+data+for+monte+carlo+simulation&rlz=1C1NHXL_esCO702CO702&oq=how+to+generate+data+for+monte+carlo+simulation&aqs=chrome..69i57.56607j0j7&sourceid=chrome&ie=UTF-8
+#https://www.researchgate.net/post/How_do_I_produce_samples_for_conducting_Monte_Carlo_experiment_for_regression_Analysis
+#https://www.investopedia.com/articles/investing/093015/create-monte-carlo-simulation-using-excel.asp
