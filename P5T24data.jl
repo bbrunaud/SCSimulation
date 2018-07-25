@@ -33,8 +33,32 @@ COper = [0.19  0.32  0.55  0.49  0.38]
 #TABLE P(I,T)      SELLING PRICE FOR PRODUCT I AT THE END OF PERIOD T
 P = [0.25  0.4  0.65  0.55  0.45]
 
+#=Esto se define en el archivo principal simu.jl
+#TABLE D(I,T)      DEMAND FOR PRODUCT I AT THE END OF PERIOD T
+D1 = [
+          0          10000        20000        0           10000        20000        0           10000        20000        0           10000        20000        0           10000        20000        0
+        15000        10000        5000        15000        10000        5000        15000        10000        5000        15000        10000        5000        15000        10000        5000        15000
+        20000        30000        40000       20000        30000        40000       20000        30000        40000       20000        30000        40000       20000        30000        40000       20000
+        20000        10000        3000        20000        10000        3000        20000        10000        3000        20000        10000        3000        20000        10000        3000        20000
+        20000        10000        2000        20000        10000        2000        20000        10000        2000        20000        10000        2000        20000        10000        2000        20000
+]
+
+D2 = [
+       10000        20000        0           10000        20000        0           10000        20000
+       10000        5000        15000        10000        5000        15000        10000        5000
+       30000        40000       20000        30000        40000       20000        30000        40000
+       10000        3000        20000        10000        3000        20000        10000        3000
+       10000        2000        20000        10000        2000        20000        10000        2000
+]
+
+Dlow = hcat(D1,D2)
+D = Dlow
+=#
+
+#=Esto se define en el archivo principal simu.jl
 #PARAMETER R(I)    PRODUCTION RATES FOR PRODUCTS
-R = [800  900  1000 1000 1200]
+R = [800.0  900  1000 1000 1200]
+=#
 
 #PARAMETER H(T)    DURATION OF PERIOD T
 H = [168 for i in 1:24]
@@ -42,6 +66,7 @@ H = [168 for i in 1:24]
 #PARAMETER HT(T)  TOTAL TIME AT THE END OF PERIOD T
 HT = [168i for i in 1:24]
 
+#=Esto se define en el archivo principal simu.jl
 #PARAMETER INVI(I)  INITIAL INVENTORY AT HAND
 INVI = [0 for i in 1:5]
-INVI = [1.0 30001.0 1.0 33001.0 1.0]
+=#

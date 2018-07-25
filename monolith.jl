@@ -1,14 +1,14 @@
 using JuMP
 using Gurobi
 
-include("P5T24data.jl")
+include("P5T24data3.jl")
 
-function monolith(D,N_products,N_periods)
+function monolith(D,R,INVI,Winit,N_products,N_periods,x_planner,bool_scheduler)
     products = 1:N_products
     periods = 1:N_periods
     slots = 1:length(products)
 
-    m = Model(solver=GurobiSolver(MIPGap=0))
+    m = Model(solver=GurobiSolver(MIPGap=0,OutputFlag=0))
 
     @variable(m, w[i in products, l in slots, t in periods], Bin)
     @variable(m, Θl[i in products, l in slots, t in periods] >= 0) # Should be positive
@@ -19,6 +19,7 @@ function monolith(D,N_products,N_periods)
     @variable(m, te[l in slots, t in periods] >= 0)
     @variable(m, ts[l in slots, t in periods] >= 0)
     @variable(m, trt[i in products, k in products, t in periods] >= 0)
+    @variable(m, trt0[i in products, k in products] >= 0)
     @variable(m, inv[i in products, t in periods] >= 0)
     @variable(m, invo[i in products, t in periods] >= 0)
     @variable(m, s[i in products, t in periods], lowerbound=D[i,t])
@@ -47,7 +48,9 @@ function monolith(D,N_products,N_periods)
     # D) Timing Relations
     @constraint(m, eq6[l in slots, t in periods], te[l,t] == ts[l,t] + sum(Θl[i,l,t] for i in products) + sum(τ[i,k]*z[i,k,l,t] for i in products, k in products) )
     @constraint(m, eq7[i in products, k in products, t in periods; t<periods[end] && i!=k], trt[i,k,t] >= w[i,slots[end],t] + w[k,slots[1],t+1] - 1)
+    @constraint(m, eq7b[i in products, k in products; i!=k], trt0[i,k] >= Winit[i] + w[k,slots[1],1] - 1)
     @constraint(m, eq8[t in periods;t<periods[end]], te[slots[end],t] + sum(τ[i,k]*trt[i,k,t] for i in products, k in products) == ts[slots[1],t+1])
+    @constraint(m, eq8b, sum(τ[i,k]*trt0[i,k] for i in products, k in products) == ts[slots[1],1])
     @constraint(m, eq9[l in slots, t in periods;l<slots[end]], te[l,t] == ts[l+1,t])
     @constraint(m, eq10[t in periods], te[slots[end], t] <= HT[t])
 
@@ -62,20 +65,26 @@ function monolith(D,N_products,N_periods)
     #@constraint(m, eq15[i in products, t in periods], s[i,t] >= D[i,t])
     # No need, specified as bound
 
+
     # A) Objective Function
     @expression(m, sales, sum(P[i]*s[i,t] for i in products, t in periods))
     @expression(m, invcost, CInv*sum(area[i,t] for t in periods, i in products) )
     @expression(m, opercost, sum(COper[i]*x[i,t] for i in products, t in periods) )
     @expression(m, transslotcost, sum(CTrans[i,k]*z[i,k,l,t] for i in products, k in products, l in slots, t in periods) )
     @expression(m, transperiodcost, sum(CTrans[i,k]*trt[i,k,t] for i in products, k in products,t in periods) )
+    @expression(m, inittransperiodcost, sum(CTrans[i,k]*trt0[i,k] for i in products, k in products) )
 
-    @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost)
-
-    #setlowerbound(x[1,1],1)
+    if bool_scheduler == true
+        @variable(m, slack_p[i in products] >= 0)
+        @variable(m, slack_n[i in products] >= 0)
+        @constraint(m, eq_pen[i in products], x[i,1]-x_planner[i] >= slack_p[i]-slack_n[i])
+        @expression(m, penalization, 1e5*sum(slack_p[i]+slack_n[i] for i in products) )
+        @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost - inittransperiodcost - penalization)
+    else
+        @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost - inittransperiodcost)
+    end
 
     return m
-
-    #objval = 52319.905226666626
 end
 
 #=

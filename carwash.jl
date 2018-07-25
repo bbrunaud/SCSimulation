@@ -45,7 +45,7 @@ Orders[5,:,:] = [
     #println("Product $p was assigned to unit $u at $(round(now(sim),2)) of week (sc.t_index) (slot $l)")
 
     @yield request(rsc)
-    println("   Unit $u started to work with product $p (slot $l) at $(round(now(sim),2))")
+    println("   Unit $u started to work with product $p (slot $l of week (sc.t_index)) at $(round(now(sim),2))")
 
     # Uncertainty of production rate: Normal distribution
     # The uncertainty should only be applied if there is any production time
@@ -54,7 +54,7 @@ Orders[5,:,:] = [
         #R_alea = rand(d_R)
         #prod_t_alea = xl/R_alea
         prod_t_alea = prod_t + rand(1:10)               #TODO: Esta linea NO debe ir en el modelo original
-        println("       The theoretical production time of product $p in unit $u (slot $l) was of $(round(prod_t,2)) hr, but it was of $(round(prod_t_alea,2)) hr")
+        println("       The production time of product $p in unit $u (slot $l) was $(round(prod_t_alea,2)) hr (), but it was of $(round(prod_t,2)) ")
         prod_t = prod_t_alea
     else
         println("       Product $p in unit $u (slot $l) did not have any production time")
