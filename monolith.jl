@@ -3,7 +3,9 @@ using Gurobi
 
 include("P5T24data3.jl")
 
-function monolith(D,R,INVI,Winit,N_products,N_periods,x_planner,bool_scheduler)
+# TODO incluir todos los parametros necesarios para saber cuando es un planer y cuando es un scheduler
+#function monolith(D,R,INVI,Winit,N_products,N_periods,x_planner,bool_scheduler)
+function monolith(D,R,INVI,Winit,N_products,N_periods)
     products = 1:N_products
     periods = 1:N_periods
     slots = 1:length(products)
@@ -74,15 +76,15 @@ function monolith(D,R,INVI,Winit,N_products,N_periods,x_planner,bool_scheduler)
     @expression(m, transperiodcost, sum(CTrans[i,k]*trt[i,k,t] for i in products, k in products,t in periods) )
     @expression(m, inittransperiodcost, sum(CTrans[i,k]*trt0[i,k] for i in products, k in products) )
 
-    if bool_scheduler == true
-        @variable(m, slack_p[i in products] >= 0)
-        @variable(m, slack_n[i in products] >= 0)
-        @constraint(m, eq_pen[i in products], x[i,1]-x_planner[i] >= slack_p[i]-slack_n[i])
-        @expression(m, penalization, 1e5*sum(slack_p[i]+slack_n[i] for i in products) )
-        @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost - inittransperiodcost - penalization)
-    else
+    #if bool_scheduler == true
+    #    @variable(m, slack_p[i in products] >= 0)
+    #    @variable(m, slack_n[i in products] >= 0)
+    #    @constraint(m, eq_pen[i in products], x[i,1]-x_planner[i] >= slack_p[i]-slack_n[i])
+    #    @expression(m, penalization, 1e5*sum(slack_p[i]+slack_n[i] for i in products) )
+    #    @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost - inittransperiodcost - penalization)
+    #else
         @objective(m, Max, sales - invcost - opercost - transslotcost - transperiodcost - inittransperiodcost)
-    end
+    #end
 
     return m
 end
