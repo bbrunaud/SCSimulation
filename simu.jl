@@ -1,9 +1,7 @@
 # x=============================================================================
 # In case that this code is used to simulate another model different of
 # monolith3.jl, the programmer should look at:
-# - "Section 1": change the parameters and data of the problem
-# - "Section 4": change the "transformation" funtion
-# - "Section 5":
+# - "Section 1":
 # x=============================================================================
 
 tic()
@@ -11,15 +9,19 @@ tic()
 using ResumableFunctions
 using SimJulia
 using Distributions
+using DataFrames
 
 # ------------------------------------------------------------------------------
 #                                 Section 1
 #                         Data, Parameters and Model
 # ------------------------------------------------------------------------------
 N_simu = 1              # Number of Monte Carlo Simulations
-N_products = 3
-N_periods_opti = 1      # Optimization horizon
-N_periods_simu = 10      # Simulation horizon (Should be greater than or equal to the Optimization horizon)
+N_rsc = 1               # Number of resources (e.g. machines, reactors, etc.)
+N_sites = 1             # Number of sites of the company
+N_products = 3          # Number of products
+N_slots = N_products    # Number of products
+N_periods_opti = 3      # Optimization horizon
+N_periods_simu = 10     # Simulation horizon (Should be greater than or equal to the Optimization horizon)
 N_planner_decision = 3  # Number of periods (weeks) when the planner makes a decision
 # TODO: Se debería crear un "Planner horizon" y un "Scheduler horizon" que
 # indican el número de periodos que tienen en cuenta el planner y el scheduler
@@ -42,8 +44,8 @@ mutable struct SCSimulationData
     R           # PRODUCTION RATES FOR PRODUCTS
     INVI        # INITIAL INVENTORY AT HAND
     Winit       # Binary variable to denote if product i was assigned to period t_index-1
+    Orders      # List of orders from the planner or scheduler to the operator
     #=
-    list        # Communication between planner/scheduler and operator
     fail_prod   # Failures in production process (operator agent): (1) week,
                 # (2) slot, (3) product and (4) amount
     sells       # Expected sales of product i in period t_index
@@ -63,8 +65,8 @@ function SCSimulationData()
     R = [800.0  900  1000 1000 1200]
     INVI = [0.0 for i in 1:N_products]
     Winit = [0 for i in 1:N_products]
+    Orders = -1*ones(N_sites,N_rsc,N_slots,4)
     #=
-    list = -1*ones(N_products,4)
     fail_prod = zeros(4,1)
     sells = -1*ones(N_products)
     backlogs = zeros(3,1)
@@ -73,7 +75,7 @@ function SCSimulationData()
     =#
 
     #s = SCSimulationData(Dem,R,INVI,Winit,list,t_index,fail_prod,sells,backlogs,info,x_planner,fail_time,i_sim)
-    s = SCSimulationData(Dem,i_sim,t_index,fail_time,planner_constant,R,INVI,Winit)
+    s = SCSimulationData(Dem,i_sim,t_index,fail_time,planner_constant,R,INVI,Winit,Orders)
 end
 
 # ------------------------------------------------------------------------------
@@ -93,6 +95,8 @@ end
         client_process = @process client(sim,sc)
         @yield client_process
 
+        # This if statement is used to know if it is the planner's turn or the
+        # scheduler's turn
         if sc.t_index == 1
             planner_process = @process planner(sim,sc)
             @yield planner_process
@@ -107,19 +111,30 @@ end
             planner_process = @process planner(sim,sc)
             @yield planner_process
 
-            # Update of the constant to know when the planner is going to make a decision
+            # Update of the constant to know when the planner is going to make a
+            # decision
             sc.planner_constant += 1
         else
-            println("   THE SCHEDULER DID IT !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            scheduler_process = @process scheduler(sim,sc)
+            @yield scheduler_process
         end
 
-        #=
-        operator_process = @process operator(sim,sc)
+        rsc = []
+        for i in 1:N_rsc
+            push!(rsc,Resource(sim, 1))
+        end
+
+        for s in 1:N_sites
+            for u in 1:N_rsc
+                for l in 1:N_slots
+                    operator_process = @process operator(sim,sc,rsc[u],s,u,l,sc.Orders[s,u,l,1],sc.Orders[s,u,l,2],sc.Orders[s,u,l,3],sc.Orders[s,u,l,4])
+                end
+            end
+        end
         @yield operator_process
 
         dispatch_process = @process dispatch(sim,sc)
         @yield dispatch_process
-        =#
     end
 
     #= TODO:Descomentar esto para guardar los KPI de la simulacion
@@ -140,6 +155,9 @@ end
 
 # ------------------------------------------------------------------------------
 #                                 Section 3
+#                            Resumable Functions
+# ------------------------------------------------------------------------------
+#                                Section 3.1
 #                             Failure function
 # This function is used to create a failure time for the process
 # ------------------------------------------------------------------------------
@@ -152,9 +170,48 @@ function fail_machine(t_ini::Number)
     t_fail2 = rand(d_fail2)         # Random failure time: time the failure will last
 
     println("\n")
-    println("---------->Next failure will happen in $t_fail")
+    println("---------> Next failure will happen in $t_fail")
 
     (t_fail,t_fail2)
+end
+
+# ------------------------------------------------------------------------------
+#                                Section 3.2
+#                           Communication function
+# This function transforms the optimization model solution into a list of works
+# for the operator (i.e. this should be the only function that must be changed
+# if the optimization model changes). Also, this function communicate the
+# expected sells for the Dispatch agent
+# ------------------------------------------------------------------------------
+function Orders_function(m::JuMP.Model,sc::SCSimulationData)
+    # TODO: Esto se debe actualizar con respecto al modelo de grafos
+    w = getindex(m,:w);         w_sol = getvalue(w)         # w = binary variable to denote if product i is assigned to slot l of period t
+    Θl = getindex(m,:Θl);       Θl_sol = getvalue(Θl)       # Θl = production time of product i in slot l of period t
+    xl = getindex(m,:xl);       xl_sol = getvalue(xl)       # xl = amount produced of product i in slot l of period t
+    ts = getindex(m,:ts);       ts_sol = getvalue(ts)       # ts = start time of slot l in period t
+    te = getindex(m,:te);       te_sol = getvalue(te)       # te = end time of slot l in period t
+    invo = getindex(m,:invo);   invo_sol = getvalue(invo)   # invo = final inventory of product i at time t after demands are satisfied
+    inv = getindex(m,:inv);     inv_sol = getvalue(inv)     # inv = inventory level of product i at the end of time period t
+    s = getindex(m,:s);         s_sol = getvalue(s)         # s = sales of product i in period t
+
+    # list is used by the operator agent
+    for si in 1:N_sites
+        for rsc in 1:N_rsc
+            for l in 1:N_slots
+                for i in 1:N_products
+                    if w_sol[i,l,1] > 0.9
+                        prod = i                        # i: product assigned to slot l in period t_index
+                        ini_t = ts_sol[l,1]               # s_t: start time of slot l in period t_index
+                        tot_t = te_sol[l,1]-ts_sol[l,1] # tot_t: total time of product i in period t_index
+                        prod_t = Θl_sol[i,l,1]          # prod_t: production time of product i in period t_index
+                        trans_t = tot_t - prod_t        # trans_t: transition time of product i in period t_index
+
+                        sc.Orders[si,rsc,l,:] = [prod,ini_t,prod_t,trans_t]
+                    end
+                end
+            end
+        end
+    end
 end
 
 # ------------------------------------------------------------------------------
@@ -162,7 +219,7 @@ end
 #                               Client agent
 # The "client" agent is responsible for generating the demand in each period
 # ------------------------------------------------------------------------------
-@resumable function client(env::Simulation,sc::SCSimulationData)
+@resumable function client(sim::Simulation,sc::SCSimulationData)
     tam = size(sc.Dem)
     for t in 1:tam[2]-1
         sc.Dem[:,t] = sc.Dem[:,t+1]
@@ -187,7 +244,7 @@ end
 #                                 Section 5
 #                               Planner agent
 # ------------------------------------------------------------------------------
-@resumable function planner(env::Simulation,sc::SCSimulationData)
+@resumable function planner(sim::Simulation,sc::SCSimulationData)
     # TODO incluir todos los parametros necesarios para saber cuando es un planer y cuando es un scheduler
     #m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods_opti,sc.x_planner,false)
     m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods_opti)
@@ -202,12 +259,114 @@ end
     println("   c(\")(\")         Solve status was $status")
     println("                   Optimization problem was solved in $m_time sec")
 
-    # "to_operator" function is used to "transform" the optimization solution
-    # into a list of works that the operator should understand and carry out
-    # TODO incluir esto ==== planner_operator(m,sc)
+    # "Orders_function" is used to "transform" the optimization solution into a
+    # list of works that the operator have to carry out
+    Orders_function(m,sc)
 
     # "to_scheduler" function is used to comucate the planner and the scheduler
     # TODO incluir esto ==== planner_scheduler(m,sc)
+end
+
+# ------------------------------------------------------------------------------
+#                                 Section 6
+#                               Scheduler agent
+# ------------------------------------------------------------------------------
+@resumable function scheduler(sim::Simulation,sc::SCSimulationData)
+    #for i in 1:N_products
+    #    println("   $(round(sc.x_planner[i],2)) units of $i")
+    #end
+    # TODO: se debe descomentar lo anterior para diferenciar lo que hace el
+    # scheduler de lo que hace el planner
+
+    # TODO incluir todos los parametros necesarios para saber cuando es un planer y cuando es un scheduler
+    #m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods_opti,sc.x_planner,false)
+    m = monolith(sc.Dem,sc.R,sc.INVI,sc.Winit,N_products,N_periods_opti)
+
+    tic()
+    status = solve(m)
+    m_time = toq()
+
+    println("\n")
+    println("   _[_]_       Scheduler agent")
+    println("   (o,o)       ")
+    println("   ( : )       ")
+    println("   ( : )       Solve status was $status")
+    println("               Optimization problem was solved in $m_time sec")
+
+    Orders_function(m,sc)
+
+    # TODO = revisar cuales seran las nuevas variables de comunicacion como las slack
+    #planner_operator(m,sc)
+    #slack_n = getindex(m,:slack_n); slack_n_sol = getvalue(slack_n)
+    #slack_p = getindex(m,:slack_p); slack_p_sol = getvalue(slack_p)
+    #cond = true
+    #for i in 1:N_products
+    #    if slack_n_sol[i] > 0 || slack_p_sol[i] > 0
+    #        println("   The Scheduler did not fully comply with the Planner's decisions for Product $i production")
+    #        cond = false
+    #    end
+    #end
+    #if cond == true
+    #    println("   The Scheduler fully complied with the Planner's decisions for all products")
+    #end
+end
+
+# ------------------------------------------------------------------------------
+#                                 Section 7
+#                              Operator agent
+# Input parameters: s=site, u=unit, l=slot, p=product, ini_t=initial time of
+#                   product p in slot l, prod_t=production time and
+#                   trans_t=transition time
+# ------------------------------------------------------------------------------
+@resumable function operator(sim::Simulation,sc::SCSimulationData,rsc::Resource,s::Number,u::Number,l::Number,p::Number,ini_t::Number,prod_t::Number,trans_t::Number)
+    println("\n")
+    println("     @..@          Operator agent")
+    println("    (----)         ")
+    println("   ( >__< )        ")
+    println("    ^^  ^^         ")
+
+    @yield timeout(sim, ini_t)
+    println("Product $p was assigned to unit $u at $(round(now(sim),2)) of week $(sc.t_index) (slot $l)")
+
+    @yield request(rsc)
+    println("   Unit $u started to work with product $p (slot $l of week $(sc.t_index)) at $(round(now(sim),2))")
+
+    @yield timeout(sim, prod_t)
+    @yield timeout(sim, trans_t)
+
+    println("   Product $p is leaving unit $u at $(round(now(sim),2))")
+    @yield release(rsc)
+end
+
+# ------------------------------------------------------------------------------
+#                                 Section 8
+#                               Dispatch agent
+# ------------------------------------------------------------------------------
+@resumable function dispatch(sim::Simulation,sc::SCSimulationData)
+    backlog = zeros(3,1)
+
+    println("\n")
+    println("    /\\_/\\        ")
+    println("   (=^.^=)         ")
+    println("   (\")_(\")_/     Dispatch agent")
+
+    #TODO Hacer que el dispatch sea el agente que genere los KPI
+    #=
+    sc.INVI -= sc.sells
+
+    for i in 1:N_products
+        if round(sc.INVI[i],2) < 0
+            backlog[1,1] = sc.t_index
+            backlog[2,1] = i
+            backlog[3,1] = -round(sc.INVI[i],2)
+
+            println("   There was a backlog of product $i in week $(sc.t_index) of $(round(-sc.INVI[i],2)) units")
+            sc.backlogs = hcat(sc.backlogs,backlog)
+        else
+            println("   No backlog of product $i in week $(sc.t_index)")
+        end
+    end
+    =#
 end
 
 # ------------------------------------------------------------------------------
@@ -218,12 +377,18 @@ simu_time = [0.0]
 for i in 1:N_simu
     tic()
 
-    montecarlo = i;     srand(montecarlo)
+    # The seed parameter is used to initialize the pseudorandom number generator
+    seed = i;     srand(seed)
     println("\n")
-    println("Seed for Monte Carlo simulation = $montecarlo")
+    println("Seed for Monte Carlo simulation = $seed")
 
-    sc = SCSimulationData()
+    sc = SCSimulationData() # This struct is used to communicate the resumable functions between themselves
     sim = Simulation()
+    rsc = []                # The Resource TODO Completar info: para qué sirven los resources?
+    for i in 1:N_rsc
+        push!(rsc,Resource(sim, 1))
+    end
+
     @process start_sim(sim,sc)
 
     sc.i_sim = i
@@ -233,7 +398,7 @@ for i in 1:N_simu
     simu_time = push!(simu_time,tim)
 
     println("\n")
-    println("Solution time for simulation #$(sc.i_sim) = $tim")
+    println("Solution time for simulation #$(sc.i_sim) = $(round(tim,2))")
 end
 
 println("\n")
@@ -242,6 +407,7 @@ println("  ___    ___   | |   ___    _ __  __   | |_    (_)   __ _    | | | | | 
 println(" / __\\  / _ \\  | |  / _ \\  | '_ ''_ '  |  _ \\  | |  / _' |   | | | | | |")
 println("| (__  | (_) | | | | (_) | | | | | | | | |_) | | | | (_| |   |_| |_| |_|")
 println(" \\___/  \\___/  |_|  \\___/  |_| |_| |_| |_'__/  |_|  \\__'_|   (_) (_) (_)   All simulations were completed")
+println("                                                                           Total simulation time = $(round(sum(simu_time),2)) sec = $(round(sum(simu_time)/60,2)) min")
 
 # ------------------------------------------------------------------------------
 #                                    End
