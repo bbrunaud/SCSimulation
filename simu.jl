@@ -1,7 +1,6 @@
 # x=============================================================================
 # In case that this code is used to simulate another model different of
-# monolith3.jl, the programmer should look at:
-# - "Section 1":
+# monolith.jl, the programmer should look at:
 # x=============================================================================
 
 tic()
@@ -10,6 +9,7 @@ using ResumableFunctions
 using SimJulia
 using Distributions
 using DataFrames
+using CSV
 
 # ------------------------------------------------------------------------------
 #                                 Section 1
@@ -18,18 +18,23 @@ using DataFrames
 N_simu = 1              # Number of Monte Carlo Simulations
 N_rsc = 1               # Number of resources (e.g. machines, reactors, etc.)
 N_sites = 1             # Number of sites of the company
-N_products = 3          # Number of products
+N_products = 5          # Number of products
 N_slots = N_products    # Number of products
 N_periods_opti = 3      # Optimization horizon
-N_periods_simu = 10     # Simulation horizon (Should be greater than or equal to the Optimization horizon)
+N_periods_simu = 5      # Simulation horizon (Should be greater than or equal to the Optimization horizon)
 N_planner_decision = 3  # Number of periods (weeks) when the planner makes a decision
 # TODO: Se debería crear un "Planner horizon" y un "Scheduler horizon" que
-# indican el número de periodos que tienen en cuenta el planner y el scheduler
+# indican el número de periodos que tienen en cuenta el planner y el scheduler.
+# En este momento solo se tiene en cuenta N_periods_opti para "ambos" agentes
 
 d_dem = Normal(14333.333,10631.595)     # Normal distribution for Demand generation
 
 # Run the file with the Optimization model
 include("monolith.jl")
+
+# Data frame to store the results
+df = DataFrame(Code_Line=[])
+df_backlogs = DataFrame(week=[],product=[],amount=[])
 
 # On the main code we define the following parameters because (1) they have
 # uncertainty or (2) they allow communication between simulation agents:
@@ -45,14 +50,12 @@ mutable struct SCSimulationData
     INVI        # INITIAL INVENTORY AT HAND
     Winit       # Binary variable to denote if product i was assigned to period t_index-1
     Orders      # List of orders from the planner or scheduler to the operator
-    #=
-    fail_prod   # Failures in production process (operator agent): (1) week,
-                # (2) slot, (3) product and (4) amount
     sells       # Expected sales of product i in period t_index
     backlogs    # Array that counts how many backlogs the process had: (1) week,
                 # (2) product and (3) amount of backlog
-    info        # Communication between planner and scheduler
-    x_planner
+    #=
+    fail_prod   # Failures in production process (operator agent): (1) week,
+                # (2) slot, (3) product and (4) amount
     =#
 end
 function SCSimulationData()
@@ -65,17 +68,13 @@ function SCSimulationData()
     R = [800.0  900  1000 1000 1200]
     INVI = [0.0 for i in 1:N_products]
     Winit = [0 for i in 1:N_products]
-    Orders = -1*ones(N_sites,N_rsc,N_slots,4)
-    #=
-    fail_prod = zeros(4,1)
+    Orders = -1*ones(N_sites,N_rsc,N_slots,5)
     sells = -1*ones(N_products)
     backlogs = zeros(3,1)
-    info = -1*ones(N_products)
-    x_planner = -1*ones(N_products)
+    #=
+    fail_prod = zeros(4,1)
     =#
-
-    #s = SCSimulationData(Dem,R,INVI,Winit,list,t_index,fail_prod,sells,backlogs,info,x_planner,fail_time,i_sim)
-    s = SCSimulationData(Dem,i_sim,t_index,fail_time,planner_constant,R,INVI,Winit,Orders)
+    s = SCSimulationData(Dem,i_sim,t_index,fail_time,planner_constant,R,INVI,Winit,Orders,sells,backlogs)
 end
 
 # ------------------------------------------------------------------------------
@@ -89,8 +88,8 @@ end
     for t_ind in 1:N_periods_simu
         sc.t_index = t_ind
 
-        println("\n")
-        println("-------------------------------------- Week #$(sc.t_index) of Simulation #$(sc.i_sim) ----------------------------------------")
+        line = ("\n"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+        line = ("-------------------------------------- Week #$(sc.t_index) of Simulation #$(sc.i_sim) ----------------------------------------"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
 
         client_process = @process client(sim,sc)
         @yield client_process
@@ -124,14 +123,22 @@ end
             push!(rsc,Resource(sim, 1))
         end
 
+        line = ("\n"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+        line = ("     @..@          Operator agent"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+        line = ("    (----)         "); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+        line = ("   ( >__< )        "); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+        line = ("    ^^  ^^         "); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
         for s in 1:N_sites
             for u in 1:N_rsc
                 for l in 1:N_slots
-                    operator_process = @process operator(sim,sc,rsc[u],s,u,l,sc.Orders[s,u,l,1],sc.Orders[s,u,l,2],sc.Orders[s,u,l,3],sc.Orders[s,u,l,4])
+                    if now(sim)+sc.Orders[s,u,l,3]+sc.Orders[s,u,l,4] > 168*sc.t_index
+                        line = ("The remaining time of week $(sc.t_index) is not enough to complete the task in slot $l"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+                    end
+                    operator_process = @process operator(sim,sc,rsc[u],s,u,l,sc.Orders[s,u,l,1],sc.Orders[s,u,l,2],sc.Orders[s,u,l,3],sc.Orders[s,u,l,4],sc.Orders[s,u,l,5])
+                    @yield operator_process
                 end
             end
         end
-        @yield operator_process
 
         dispatch_process = @process dispatch(sim,sc)
         @yield dispatch_process
@@ -139,23 +146,23 @@ end
 
     #= TODO:Descomentar esto para guardar los KPI de la simulacion
     final = size(sc.backlogs)
-    println("\n")
-    println("The process had $(final[2]-1) backlog(s) in total during the simulation")
+    line = ("\n"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("The process had $(final[2]-1) backlog(s) in total during the simulation"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
     for ind in 2:final[2]
-        println("   One in week $(round(sc.backlogs[1,ind],2)) of $(round(sc.backlogs[3,ind],2)) units of product $(round(sc.backlogs[2,ind],2))")
+        line = ("   One in week $(round(sc.backlogs[1,ind],2)) of $(round(sc.backlogs[3,ind],2)) units of product $(round(sc.backlogs[2,ind],2))"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
     end
     =#
 
-    println("\n")
-    println("  ___   _ __  __    _   _")
-    println(" / __\\ | '_ ''_ '  | | | |")
-    println("| (__  | | | | | | | |_| |")
-    println(" \\___/ |_| |_| |_|  \\___/        Simulation #$(sc.i_sim) was completed")
+    line = ("\n"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("  ___   _ __  __    _   _"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = (" / __\\ | '_ ''_ '  | | | |"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("| (__  | | | | | | | |_| |"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = (" \\___/ |_| |_| |_|  \\___/        Simulation #$(sc.i_sim) was completed"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
 end
 
 # ------------------------------------------------------------------------------
 #                                 Section 3
-#                            Resumable Functions
+#                          Not Resumable Functions
 # ------------------------------------------------------------------------------
 #                                Section 3.1
 #                             Failure function
@@ -169,8 +176,7 @@ function fail_machine(t_ini::Number)
     d_fail2 = Normal(2,0.5)         # Normal distribution
     t_fail2 = rand(d_fail2)         # Random failure time: time the failure will last
 
-    println("\n")
-    println("---------> Next failure will happen in $t_fail")
+    line = ("---------> Next failure will happen in $(round(t_fail,2))"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
 
     (t_fail,t_fail2)
 end
@@ -201,17 +207,21 @@ function Orders_function(m::JuMP.Model,sc::SCSimulationData)
                 for i in 1:N_products
                     if w_sol[i,l,1] > 0.9
                         prod = i                        # i: product assigned to slot l in period t_index
-                        ini_t = ts_sol[l,1]               # s_t: start time of slot l in period t_index
+                        ini_t = ts_sol[l,1]             # s_t: start time of slot l in period t_index
                         tot_t = te_sol[l,1]-ts_sol[l,1] # tot_t: total time of product i in period t_index
                         prod_t = Θl_sol[i,l,1]          # prod_t: production time of product i in period t_index
                         trans_t = tot_t - prod_t        # trans_t: transition time of product i in period t_index
+                        amount = xl_sol[i,l,1]          # amount: amount produced of product i in period t
 
-                        sc.Orders[si,rsc,l,:] = [prod,ini_t,prod_t,trans_t]
+                        sc.Orders[si,rsc,l,:] = [prod,ini_t,prod_t,trans_t,amount]
                     end
                 end
             end
         end
     end
+
+    # sells is used by the dispatch agent
+    sc.sells[:] = s_sol[:,1]
 end
 
 # ------------------------------------------------------------------------------
@@ -229,14 +239,14 @@ end
     # None of the generated numbers should be negative
     sc.Dem = abs.(sc.Dem)
 
-    println("\n")
-    println("    ^__^               Client agent")
-    println("    (oo)\\______       ")
-    println("   (__)\\       )\\/\\ ")
-    println("        ||---- |       ")
-    println("        ||    ||       The demand of week $(sc.t_index) is: ")
+    line = ("\n"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("    ^__^               Client agent"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("    (oo)\\______       "); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("   (__)\\       )\\/\\ "); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("        ||---- |       "); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("        ||    ||       The demand of week $(sc.t_index) is: "); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
     for i in 1:N_products
-        println("                       $(round(sc.Dem[i,1],2)) units of $i")
+        line = ("                       $(round(sc.Dem[i,1],2)) units of $i"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
     end
 end
 
@@ -253,11 +263,11 @@ end
     status = solve(m)
     m_time = toq()
 
-    println("\n")
-    println("   (\\ _ /)         Planner agent")
-    println("   ( 'x' )         ")
-    println("   c(\")(\")         Solve status was $status")
-    println("                   Optimization problem was solved in $m_time sec")
+    line = ("\n"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("   (\\ _ /)         Planner agent"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("   ( 'x' )         "); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("   c(\")(\")         Solve status was $status"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("                   Optimization problem was solved in $m_time sec"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
 
     # "Orders_function" is used to "transform" the optimization solution into a
     # list of works that the operator have to carry out
@@ -286,12 +296,12 @@ end
     status = solve(m)
     m_time = toq()
 
-    println("\n")
-    println("   _[_]_       Scheduler agent")
-    println("   (o,o)       ")
-    println("   ( : )       ")
-    println("   ( : )       Solve status was $status")
-    println("               Optimization problem was solved in $m_time sec")
+    line = ("\n"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("   _[_]_       Scheduler agent"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("   (o,o)       "); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("   ( : )       "); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("   ( : )       Solve status was $status"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("               Optimization problem was solved in $m_time sec"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
 
     Orders_function(m,sc)
 
@@ -302,12 +312,12 @@ end
     #cond = true
     #for i in 1:N_products
     #    if slack_n_sol[i] > 0 || slack_p_sol[i] > 0
-    #        println("   The Scheduler did not fully comply with the Planner's decisions for Product $i production")
+    #        line = ("   The Scheduler did not fully comply with the Planner's decisions for Product $i production"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
     #        cond = false
     #    end
     #end
     #if cond == true
-    #    println("   The Scheduler fully complied with the Planner's decisions for all products")
+    #    line = ("   The Scheduler fully complied with the Planner's decisions for all products"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
     #end
 end
 
@@ -318,55 +328,80 @@ end
 #                   product p in slot l, prod_t=production time and
 #                   trans_t=transition time
 # ------------------------------------------------------------------------------
-@resumable function operator(sim::Simulation,sc::SCSimulationData,rsc::Resource,s::Number,u::Number,l::Number,p::Number,ini_t::Number,prod_t::Number,trans_t::Number)
-    println("\n")
-    println("     @..@          Operator agent")
-    println("    (----)         ")
-    println("   ( >__< )        ")
-    println("    ^^  ^^         ")
-
-    @yield timeout(sim, ini_t)
-    println("Product $p was assigned to unit $u at $(round(now(sim),2)) of week $(sc.t_index) (slot $l)")
-
+@resumable function operator(sim::Simulation,sc::SCSimulationData,rsc::Resource,s::Number,u::Number,l::Number,p::Number,ini_t::Number,prod_t::Number,trans_t::Number,amount::Number)
     @yield request(rsc)
-    println("   Unit $u started to work with product $p (slot $l of week $(sc.t_index)) at $(round(now(sim),2))")
+    line = ("Unit $u started to work with product $p (slot $l of week $(sc.t_index)) at $(round(now(sim),2))"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
 
-    @yield timeout(sim, prod_t)
-    @yield timeout(sim, trans_t)
+    # Uncertainty of production rate: Normal distribution. The uncertainty
+    # should only be applied if there is any production time
+    if prod_t > 0
+        d_R = Normal(sc.R[convert(Int64,p)]-45,50)
+        R_alea = rand(d_R)
+        prod_t_alea = amount/R_alea
+        line = ("   The theoretical production time was of $(round(prod_t,2)) hr, but it was of $(round(prod_t_alea,2)) hr"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+        prod_t = prod_t_alea
+        sc.INVI[convert(Int64,p)] += prod_t*R_alea
+    else
+        line = ("   Product $p was not produced in slot $l of week $(sc.t_index) (The inventory was not updated)"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    end
+    @yield timeout(sim,prod_t)
 
-    println("   Product $p is leaving unit $u at $(round(now(sim),2))")
+    # Uncertainty of transition time: Normal distribution
+    # The uncertainty should only be applied if there is any transition time
+    # trans_t >= 0.5 is because that is the minimal transition time in the model
+    if trans_t >= 0.5
+        d_trans_t = Normal(trans_t+0.1,0.2)
+        trans_t_alea = rand(d_trans_t)
+        line = ("   The theoretical transition time was of $(round(trans_t,2)) hr, but it was of $(round(trans_t_alea,2)) hr"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+        trans_t = trans_t_alea
+    else
+        line = ("   Product $p did not have any transition time in slot $l"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    end
+    @yield timeout(sim,trans_t)
+
+    # Uncertainty of failure: If there was a failure, then the a failure time is
+    # going to be added to the total time
+    if now(sim) >= sc.fail_time[1]
+        # The process had a failure
+        line = ("---------> There was a failure of $(round(sc.fail_time[2],2)) hours in slot $l of week $(sc.t_index) at $(round(sc.fail_time[1],2))"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+        @yield timeout(sim,sc.fail_time[2])
+
+        # Set up the new failure time
+        sc.fail_time = fail_machine(sc.fail_time[1])
+    end
+
+    line = ("       Product $p is leaving unit $u at $(round(now(sim),2))"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
     @yield release(rsc)
 end
 
-# ------------------------------------------------------------------------------
-#                                 Section 8
-#                               Dispatch agent
-# ------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------- #
+#                                 Section 8                                    #
+#                               Dispatch agent                                 #
+# ---------------------------------------------------------------------------- #
 @resumable function dispatch(sim::Simulation,sc::SCSimulationData)
     backlog = zeros(3,1)
 
-    println("\n")
-    println("    /\\_/\\        ")
-    println("   (=^.^=)         ")
-    println("   (\")_(\")_/     Dispatch agent")
+    line = ("\n"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("    /\\_/\\        "); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("   (=^.^=)         "); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("   (\")_(\")_/     Dispatch agent"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
 
     #TODO Hacer que el dispatch sea el agente que genere los KPI
-    #=
     sc.INVI -= sc.sells
 
     for i in 1:N_products
+        #if round(sc.INVI[i]-sc.sells[i],2) < 0
         if round(sc.INVI[i],2) < 0
             backlog[1,1] = sc.t_index
             backlog[2,1] = i
             backlog[3,1] = -round(sc.INVI[i],2)
 
-            println("   There was a backlog of product $i in week $(sc.t_index) of $(round(-sc.INVI[i],2)) units")
-            sc.backlogs = hcat(sc.backlogs,backlog)
+            line = ("   There was a backlog of product $i in week $(sc.t_index) of $(round(-sc.INVI[i],2)) units"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+            sc.backlogs = hcat(sc.backlogs,backlog); push!(df_backlogs,sc.t_index,i,round(-sc.INVI[i],2)); CSV.write("KPI1.csv",df_backlogs);
         else
-            println("   No backlog of product $i in week $(sc.t_index)")
+            line = ("   No backlog of product $i in week $(sc.t_index)"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
         end
     end
-    =#
 end
 
 # ------------------------------------------------------------------------------
@@ -379,8 +414,8 @@ for i in 1:N_simu
 
     # The seed parameter is used to initialize the pseudorandom number generator
     seed = i;     srand(seed)
-    println("\n")
-    println("Seed for Monte Carlo simulation = $seed")
+    line = ("\n"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("Seed for Monte Carlo simulation = $seed"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
 
     sc = SCSimulationData() # This struct is used to communicate the resumable functions between themselves
     sim = Simulation()
@@ -397,17 +432,20 @@ for i in 1:N_simu
     tim = convert(Float64,toq())
     simu_time = push!(simu_time,tim)
 
-    println("\n")
-    println("Solution time for simulation #$(sc.i_sim) = $(round(tim,2))")
+    line = ("\n"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+    line = ("Solution time for simulation #$(sc.i_sim) = $(round(tim,2))"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
 end
 
-println("\n")
-println("                _                       _       _             _   _   _")
-println("  ___    ___   | |   ___    _ __  __   | |_    (_)   __ _    | | | | | |")
-println(" / __\\  / _ \\  | |  / _ \\  | '_ ''_ '  |  _ \\  | |  / _' |   | | | | | |")
-println("| (__  | (_) | | | | (_) | | | | | | | | |_) | | | | (_| |   |_| |_| |_|")
-println(" \\___/  \\___/  |_|  \\___/  |_| |_| |_| |_'__/  |_|  \\__'_|   (_) (_) (_)   All simulations were completed")
-println("                                                                           Total simulation time = $(round(sum(simu_time),2)) sec = $(round(sum(simu_time)/60,2)) min")
+line = ("\n"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+line = ("                _                       _       _             _   _   _"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+line = ("  ___    ___   | |   ___    _ __  __   | |_    (_)   __ _    | | | | | |"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+line = (" / __\\  / _ \\  | |  / _ \\  | '_ ''_ '  |  _ \\  | |  / _' |   | | | | | |"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+line = ("| (__  | (_) | | | | (_) | | | | | | | | |_) | | | | (_| |   |_| |_| |_|"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+line = (" \\___/  \\___/  |_|  \\___/  |_| |_| |_| |_'__/  |_|  \\__'_|   (_) (_) (_)   All simulations were completed"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+line = ("                                                                           Total simulation time = $(round(sum(simu_time),2)) sec = $(round(sum(simu_time)/60,2)) min"); println(line); push!(df,[line]); CSV.write("tabla.csv",df);
+
+println(df)
+println(df_backlogs)
 
 # ------------------------------------------------------------------------------
 #                                    End
@@ -436,3 +474,6 @@ println("                                                                       
 # información como: Una hoja de los parametros generados aleatoriamente, otra
 # con los resultados de KPI, otra con la información de qué ocurrió durante la
 # simu, etc.
+
+# El modelo de optimizacion debe ser aprueba de errores, es decir que nunca
+# puede dar infactible
