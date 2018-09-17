@@ -19,6 +19,10 @@ mutable struct SCSData
     forecast_σ
     forecastvariation
     forecastvariationpercent
+    # Models
+    graph
+    inventory
+    iterations
     # Time
     currentperiod
 end

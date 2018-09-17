@@ -9,13 +9,13 @@
 
 @resumable function demand_planner(d::SCSData)
     if isempty(d.forecast)
-        initialize_forecast!(d)
+        initialize_forecast(d)
     else
-        update_forecast!(d)
+        update_forecast(d)
     end
 end
 
-function initialize_forecast!(d::SCSData, ts=1, te=ts + d.planninghorizon - 1; verbose=false)
+function initialize_forecast(d::SCSData, ts=d.currentperiod+d.planningdiscretization, te=ts + d.planninghorizon - 1; verbose=false)
     verbose && println("Initializing Forecast with ts = $ts, te=$te")
     d.planstartperiod = ts
     H = d.planninghorizon
@@ -32,8 +32,8 @@ function initialize_forecast!(d::SCSData, ts=1, te=ts + d.planninghorizon - 1; v
     end
 end
 
-function update_forecast!(d::SCSData; verbose=false)
-    ts = d.currentperiod
+function update_forecast(d::SCSData; verbose=false)
+    ts = d.currentperiod + 1
     H = d.planninghorizon
     T = d.planningdiscretization
     for t in ts:T:d.planendperiod
@@ -47,7 +47,7 @@ function update_forecast!(d::SCSData; verbose=false)
     end
     if d.planendperiod+1 <= ts+H-1
         verbose && println("New forecast starting at t = $(d.planendperiod+1)")
-        initialize_forecast!(d, d.planendperiod+1, ts+H-1, verbose=verbose)
+        initialize_forecast(d, d.planendperiod+1, ts+H-1, verbose=verbose)
     end
     d.planstartperiod = ts
     d.planendperiod = ts + H - 1

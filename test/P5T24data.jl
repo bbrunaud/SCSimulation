@@ -53,7 +53,7 @@ D2 = [
 ]
 
 Dlow = hcat(D1,D2)
-D = Dlow
+Dem = Dlow
 
 #PARAMETER R(I)    PRODUCTION RATES FOR PRODUCTS
 R = [800  900  1000 1000 1200]
