@@ -50,6 +50,8 @@ end
 
 @objective(m, Min, -sales + invcost + opercost)
 
+m.ext[:customers] = customers
+m.ext[:plants] = plants
 m.ext[:products] = products
 m.ext[:numperiods] = length(periods)
 m.ext[:periodmap] = Dict()

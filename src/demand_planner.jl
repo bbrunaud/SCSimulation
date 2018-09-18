@@ -40,7 +40,7 @@ function update_forecast(d::SCSData; verbose=false)
         for c in d.customers
             for p in d.products
                 if rand() < d.forecastvariation
-                    d.forecast[c,p,t]*=rand(1-d.forecastvariationpercent:0.01:1+d.forecastvariationpercent)
+                    d.forecast[c,p,t]*=rand(1-d.forecastvariationpercent*t/d.planendperiod:0.01:1+d.forecastvariationpercent*t/d.planendperiod)
                 end
             end
         end

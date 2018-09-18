@@ -34,6 +34,7 @@ function update_planning_model(d)
     for i in d.plants
         for p in d.products
              JuMP.fix(inv[i,p,0], d.inventory[i,p,d.currentperiod])
+             setcategory(inv[i,p,0], :Cont)
          end
     end
     # Update demand
@@ -42,6 +43,7 @@ function update_planning_model(d)
         for p in d.products
             for t in 1:m.ext[:numperiods]
                 JuMP.fix(D[c,p,t], d.forecast[c,p,tmap[t]])
+                setcategory(D[c,p,t], :Cont)
             end
         end
     end
@@ -50,6 +52,13 @@ end
 """
 Pass solution from monolith model to individual models in the graph
 """
-function monolith_to_graph
-
+function monolith_to_graph(model::JuMP.Model, graph::ModelGraph)
+    k = 1
+    for i in 1:length(getnodes(graph))
+        m = getmodel(getnode(graph,i))
+        m.colVal = model.colVal[k:k+m.numCols-1]
+        k = m.numCols + 1
+    endfunction
 end
+
+monolith_to_graph(d::SCSdata) = monolith_to_graph(getattribute(d.graph,:monolith), d.graph)

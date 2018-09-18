@@ -4,6 +4,7 @@ mutable struct SCSData
     products
     plants
     customersfor
+    producttype
     # Planning
     planninghorizon
     planningdiscretization

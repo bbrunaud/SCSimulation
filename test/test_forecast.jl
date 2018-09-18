@@ -5,10 +5,13 @@ using Gaston
 fcast_μ = Dict((:C1,:P1) => 100)
 fcast_σ = Dict((:C1,:P1) => 20)
 custfor = Dict(:M1 => [:C1])
+ptype = Dict(:P1 => :MTS)
+
 d = SCSData([:C1],
             [:P1],
             [:M1],
             custfor,
+            ptype,
             6,
             1,
             0,
