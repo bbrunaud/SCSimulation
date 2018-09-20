@@ -1,5 +1,6 @@
 using Base.Test
 using SCSimulation
+using DataFrames
 
 srand(12345)
 
@@ -21,12 +22,13 @@ d = SCSData([:C1],
             [:M1],
             custfor,
             ptype,
-            84,
-            7,
+            1344,
+            168,
             0,
             0,
-            Delivery[],
-            14,
+            DataFrame(plant=[],product=[],amount=[],date=[], delivered=[], actual_date=[], status=[]),
+            336,
+            4,
             Dict(),
             fcast_μ,
             fcast_σ,

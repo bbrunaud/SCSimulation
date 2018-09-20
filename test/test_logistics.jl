@@ -1,6 +1,6 @@
 using Base.Test
 using SCSimulation
-
+using DataFrames
 
 fcast_μ = Dict((:C1,:P1) => 100)
 fcast_σ = Dict((:C1,:P1) => 20)
@@ -12,12 +12,13 @@ d = SCSData([:C1],
             [:M1],
             custfor,
             ptype,
-            84,
-            7,
+            1344,
+            168,
             0,
             0,
-            Delivery[],
-            14,
+            DataFrame(plant=[],product=[],amount=[],date=[], delivered=[], actual_date=[], status=[]),
+            336,
+            4,
             Dict(),
             fcast_μ,
             fcast_σ,
@@ -31,7 +32,7 @@ d = SCSData([:C1],
 initialize_forecast(d)
 initialize_orders(d, verbose=true)
 
-@test isa(d.deliveries[1], Delivery)
+@test size(d.deliveries,1) > 0
 
-d.currentperiod = 7
+d.currentperiod = 168
 update_orders(d, verbose=true)

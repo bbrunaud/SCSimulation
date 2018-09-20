@@ -33,7 +33,7 @@ function initialize_forecast(d::SCSData, ts=d.currentperiod+d.planningdiscretiza
 end
 
 function update_forecast(d::SCSData; verbose=false)
-    ts = d.currentperiod + 1
+    ts = d.currentperiod + 168
     H = d.planninghorizon
     T = d.planningdiscretization
     for t in ts:T:d.planendperiod
@@ -45,7 +45,7 @@ function update_forecast(d::SCSData; verbose=false)
             end
         end
     end
-    if d.planendperiod+1 <= ts+H-1
+    if d.planendperiod+168 <= ts+H-1
         verbose && println("New forecast starting at t = $(d.planendperiod+1)")
         initialize_forecast(d, d.planendperiod+1, ts+H-1, verbose=verbose)
     end

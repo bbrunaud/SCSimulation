@@ -6,6 +6,9 @@ using Distributions
 using JuMP
 using Plasmo
 using PlasmoAlgorithms
+using DataFrames
+using Query
+using Scheduling
 
 export SCSData, Delivery,
         # Demand Planner

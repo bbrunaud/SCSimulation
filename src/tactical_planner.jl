@@ -25,7 +25,7 @@ function update_planning_model(d)
     m = getmodel(node)
     # Update period map
     tmap = m.ext[:periodmap]
-    periods = 7:d.planningdiscretization:d.planninghorizon
+    periods = d.planningdiscretization:d.planningdiscretization:d.planninghorizon
     for (t,T) in enumerate(periods)
         tmap[t] = T
     end
@@ -58,7 +58,7 @@ function monolith_to_graph(model::JuMP.Model, graph::ModelGraph)
         m = getmodel(getnode(graph,i))
         m.colVal = model.colVal[k:k+m.numCols-1]
         k = m.numCols + 1
-    endfunction
+    end
 end
 
-monolith_to_graph(d::SCSdata) = monolith_to_graph(getattribute(d.graph,:monolith), d.graph)
+monolith_to_graph(d::SCSData) = monolith_to_graph(getattribute(d.graph,:monolith), d.graph)

@@ -14,6 +14,7 @@ mutable struct SCSData
     deliveries
     # Scheduling
     schedulinghorizon
+    schedulingdiscretization
     # Forecast
     forecast
     forecast_μ
@@ -26,16 +27,4 @@ mutable struct SCSData
     iterations
     # Time
     currentperiod
-end
-
-mutable struct SCSim
-    sim
-    data
-end
-
-mutable struct Delivery
-    plant
-    product
-    amount
-    date
 end
