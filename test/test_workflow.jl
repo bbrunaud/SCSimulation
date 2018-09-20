@@ -10,7 +10,7 @@ using JuMP
 fcast_μ = Dict((:C1,i) => 100 for i in [:P1,:P2])
 fcast_σ = Dict((:C1,i) => 20 for i in [:P1,:P2])
 custfor = Dict(:M1 => [:C1])
-initialinventory = Dict((:M1,i,0) => 200 for i in [:P1,:P2])
+initialinventory = Dict((:M1,i,0) => 50 for i in [:P1,:P2])
 ptype = Dict(:P1 => :MTS,
              :P2 => :MTS)
 tk = Dict(:P1 => :Tk_P1, :P2 => :Tk_P2)
@@ -25,6 +25,13 @@ g = ModelGraph()
 Plasmo.setsolver(g, GurobiSolver(MIPGap=0.1))
 n1 = add_node(g, pm)
 n2 = add_node(g, m)
+setattribute(n2,:network, n)
+ct = DataFrame(DataFrame(Task=[], Material=[], Time=[], Sense=[], Coefficient=[]))
+for (key, value) in n.coefficient
+         push!(ct, vcat(key...,value))
+end
+setattribute(n2,:coefftable, ct)
+
 add_edge(g, n1, n2)
 @linkconstraint(g, [p in products, t in periods], n1[:inv][:M1,p,t] == n2[:invtgt][tk[p],p,42t])
 @linkconstraint(g, [p in products, t in periods], n1[:x][:M1,p,t] == n2[:prodtgt][p,t])
@@ -39,6 +46,10 @@ d = SCSData([:C1],
             0,
             0,
             DataFrame(plant=[],product=[],amount=[],date=[], delivered=[], actual_date=[], status=[]),
+            DataFrame(Order=[], Plant=[], Task=[], Unit=[], Start=[], Duration=[], Size=[], ActualStart=[], ActualDuration=[], Perturbed=[], Status=[]),
+            DataFrame(Order=[], Plant=[], Task=[], Unit=[], Material=[], Time=[], Amount=[], Status=[]),
+            DataFrame(Order=[], Plant=[], Task=[], Unit=[], Material=[], Time=[], Amount=[], Status=[]),
+            nothing,
             1344,
             4,
             Dict(),
@@ -49,7 +60,8 @@ d = SCSData([:C1],
             g,
             initialinventory,
             1,
-            0)
+            0,
+            1000000)
 
 
 initialize_forecast(d)
@@ -75,16 +87,17 @@ JuMP.setsolver(mf, getsolver(d.graph))
 
 solve(mf)
 monolith_to_graph(mf, d.graph)
-
+post_production_orders(d)
 
 @test m.colVal[1] != NaN
 
 d.currentperiod = 168
 
 update_orders(d, verbose=true)
-#=
 update_scheduling_models(d)
 status = solve(sm)
-
 @test status == :Optimal
+
+#=
+
 =#

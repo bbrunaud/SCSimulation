@@ -12,6 +12,10 @@ mutable struct SCSData
     planendperiod
     # Logistics
     deliveries
+    orders
+    consumptions
+    productions
+    maintenance
     # Scheduling
     schedulinghorizon
     schedulingdiscretization
@@ -27,4 +31,5 @@ mutable struct SCSData
     iterations
     # Time
     currentperiod
+    ordernumber
 end

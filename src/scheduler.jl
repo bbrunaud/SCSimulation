@@ -97,5 +97,46 @@ end
 
 
 function post_production_orders(d::SCSData)
+    for plant in d.plants
+        n = 2
+        m = getmodel(getnode(d.graph,n))
+        net = getattribute(getnode(d.graph,n), :network)
+        ct = getattribute(getnode(d.graph,n), :coefftable)
+        b = getindex(net.model, :b)
+        bv = JuMP.getvalue(b)
 
+        for (i,j,t) in keys(bv)
+            if bv[i,j,t] > 1e-8 && t <= 168/d.schedulingdiscretization
+                # Increase order number
+                d.ordernumber += 1
+                # Save order general info
+                starttime = d.schedulingdiscretization*t+d.currentperiod
+                duration = d.schedulingdiscretization*net.processingtime[j]
+                push!(d.orders, [d.ordernumber, plant, j, i, starttime, duration, bv[i,j,t], 0, 0, false, :planned])
+                sort!(d.orders, cols=[:Start,:Task])
+                # Save consumptions
+                tb = @from row in ct begin
+                     @where row.Task == j && row.Sense == :in
+                     @select {row.Material, row.Coefficient}
+                     @collect DataFrame
+                 end
+                for row in 1:size(tb,1)
+                    push!(d.consumptions, [d.ordernumber, plant, j, i, tb[row,:Material], starttime,  bv[i,j,t]*tb[row,:Coefficient], :planned])
+                end
+                sort!(d.consumptions, cols=[:Time,:Task])
+                # Save productions
+                tbo = @from row in ct begin
+                     @where row.Task == j && row.Sense == :out
+                     @select {row.Material, row.Coefficient}
+                     @collect DataFrame
+                 end
+                for row in 1:size(tbo,1)
+                    push!(d.productions, [d.ordernumber, plant, j, i, tbo[row,:Material], starttime+duration,  bv[i,j,t]*tbo[row,:Coefficient], :planned])
+                end
+                sort!(d.productions, cols=[:Time,:Task])
+            end
+        end
+
+        n += 1
+    end
 end
