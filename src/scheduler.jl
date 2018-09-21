@@ -112,7 +112,7 @@ function post_production_orders(d::SCSData; verbose=true)
                 # Save order general info
                 starttime = d.schedulingdiscretization*t+d.currentperiod
                 duration = d.schedulingdiscretization*net.processingtime[j]
-                push!(d.orders, [d.ordernumber, plant, j, i, starttime, duration, bv[i,j,t], 0, 0, false, :planned])
+                push!(d.orders, [d.ordernumber, plant, j, i, starttime, duration, bv[i,j,t], 0, 0, false, :Planned])
                 sort!(d.orders, cols=[:Start,:Task])
                 # Save consumptions
                 tb = @from row in ct begin
@@ -121,7 +121,8 @@ function post_production_orders(d::SCSData; verbose=true)
                      @collect DataFrame
                  end
                 for row in 1:size(tb,1)
-                    push!(d.consumptions, [d.ordernumber, plant, j, i, tb[row,:Material], starttime,  bv[i,j,t]*tb[row,:Coefficient], :planned])
+                    d.consumptionnumber += 1
+                    push!(d.consumptions, [d.consumptionnumber, d.ordernumber, plant, j, i, tb[row,:Material], starttime,  bv[i,j,t]*tb[row,:Coefficient], starttime])
                 end
                 sort!(d.consumptions, cols=[:Time,:Task])
                 # Save productions
@@ -131,7 +132,8 @@ function post_production_orders(d::SCSData; verbose=true)
                      @collect DataFrame
                  end
                 for row in 1:size(tbo,1)
-                    push!(d.productions, [d.ordernumber, plant, j, i, tbo[row,:Material], starttime+duration,  bv[i,j,t]*tbo[row,:Coefficient], :planned])
+                    d.productionnumber += 1
+                    push!(d.productions, [d.productionnumber, d.ordernumber, plant, j, i, tbo[row,:Material], starttime+duration,  bv[i,j,t]*tbo[row,:Coefficient], starttime+duration,  bv[i,j,t]*tbo[row,:Coefficient]])
                 end
                 sort!(d.productions, cols=[:Time,:Task])
             end

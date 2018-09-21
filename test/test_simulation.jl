@@ -72,8 +72,8 @@ d = SCSData([:C1],
             0,
             DataFrame(Plant=[], Product=[], Amount=[], Date=[], Delivered=[], Actual_Date=[], Status=[]),
             DataFrame(Order=[], Plant=[], Task=[], Unit=[], Start=[], Duration=[], Size=[], ActualStart=[], ActualDuration=[], Perturbed=[], Status=[]),
-            DataFrame(Order=[], Plant=[], Task=[], Unit=[], Material=[], Time=[], Amount=[], Status=[]),
-            DataFrame(Order=[], Plant=[], Task=[], Unit=[], Material=[], Time=[], Amount=[], Status=[]),
+            DataFrame(Number=[], Order=[], Plant=[], Task=[], Unit=[], Material=[], Time=[], Amount=[], ActualTime=[]),
+            DataFrame(Number=[], Order=[], Plant=[], Task=[], Unit=[], Material=[], Time=[], Amount=[], ActualTime=[], ActualAmount=[]),
             fails,
             unitstatus,
             1344,
@@ -87,6 +87,8 @@ d = SCSData([:C1],
             initialinventory,
             1,
             0,
-            1000000)
+            1000000,
+            1000,
+            1000)
 
 runsimu(d, verbose=true)

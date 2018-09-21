@@ -1,5 +1,5 @@
 function runsimu(d::SCSData; verbose=true)
-    for iter in 0:24
+    for iter in 0:6
         verbose && println("START SIMULATION HOUR $iter")
         d.currentperiod = iter
         if iter > 0

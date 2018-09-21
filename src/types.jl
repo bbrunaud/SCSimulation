@@ -35,4 +35,6 @@ mutable struct SCSData
     # Time
     currentperiod
     ordernumber
+    consumptionnumber
+    productionnumber
 end
