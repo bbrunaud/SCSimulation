@@ -18,7 +18,13 @@ export SCSData, Delivery,
         # Tactical Planner
         tactical_planner, update_planning_model, monolith_to_graph,
         # Scheduler
-        scheduler, update_scheduling_models, post_production_orders
+        scheduler, update_scheduling_models, post_production_orders,
+        # Operator
+        maintenance, operator,
+        # Simulation
+        runsimu,
+        # Utils
+        getlowerboundnz, getupperboundnz, getvaluenz
 
 
 include("types.jl")
@@ -26,6 +32,9 @@ include("demand_planner.jl")
 include("logistics_planner.jl")
 include("tactical_planner.jl")
 include("scheduler.jl")
+include("operator.jl")
+include("simulation.jl")
+include("utils.jl")
 
 
 end

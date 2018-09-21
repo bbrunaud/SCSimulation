@@ -18,7 +18,7 @@ tk = Dict(:P1 => :Tk_P1, :P2 => :Tk_P2)
 
 include("planning.jl")
 include("kondili.jl")
-initialinventory = Dict((:M1,i,0) => 50 for i in n.materials[n.name])
+initialinventory = Dict((:M1,i,0) => 50.0 for i in n.materials[n.name])
 n.backlogpenalty = [1 for t in 1:n.periods]
 m = generatemodelUOPSS!(n, objective=[:minbacklog, :minbatches])
 JuMP.setsolver(m,GurobiSolver(MIPGap=0.1))
@@ -89,39 +89,4 @@ d = SCSData([:C1],
             0,
             1000000)
 
-
-initialize_forecast(d)
-initialize_orders(d, verbose=true)
-
-update_planning_model(d)
-m = getmodel(getnode(d.graph,1))
-D = getindex(m, :D)
-inv = getindex(m, :inv)
-
-@test getvalue(D[:C1,:P1,1]) > 0
-@test getvalue(inv[:M1,:P1,0]) > 0
-
-update_scheduling_models(d)
-sm = getmodel(getnode(d.graph,2))
-Ds = getindex(sm,:D)
-#@test getlowerbound(Ds[:P1,11]) > 0
-
-mf = create_jump_graph_model(d.graph)
-setattribute(d.graph, :monolith, mf)
-JuMP.setsolver(mf, getsolver(d.graph))
-
-
-solve(mf)
-monolith_to_graph(mf, d.graph)
-post_production_orders(d)
-
-@test m.colVal[1] != NaN
-
-#=
-d.currentperiod = 168
-
-update_orders(d, verbose=true)
-update_scheduling_models(d)
-status = solve(sm)
-@test status == :Optimal
-=#
+runsimu(d, verbose=true)

@@ -7,11 +7,13 @@
 """=#
 
 
-@resumable function demand_planner(d::SCSData)
+function demand_planner(d::SCSData; verbose=true)
+    verbose && "START demand planner"
     if isempty(d.forecast)
-        initialize_forecast(d)
+        verbose && "Forecast is empty, generating a new one"
+        initialize_forecast(d, verbose=verbose)
     else
-        update_forecast(d)
+        update_forecast(d, verbose=verbose)
     end
 end
 

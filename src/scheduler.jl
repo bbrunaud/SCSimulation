@@ -5,12 +5,12 @@
 
 """=#
 
-@resumable function scheduler(d::SCSData)
-    update_scheduling_models(d)
+function scheduler(d::SCSData; verbose=verbose)
+    update_scheduling_models(d, verbose=verbose)
     for i in 2:length(getnodes(d.graph))
         JuMP.solve(getmodel(getnode(d.graph,i)))
     end
-    post_production_orders(d)
+    post_production_orders(d, verbose=verbose)
 end
 
 function update_scheduling_models(d::SCSData; verbose=false)
@@ -61,8 +61,8 @@ function update_scheduling_models(d::SCSData; verbose=false)
         D = getindex(m, :D)
 
         orders = @from row in d.deliveries begin
-                 @where row.plant == i && row.status == :open && row.date > d.currentperiod
-                 @select {row.product, row.date, row.amount}
+                 @where row.Plant == i && row.Status == :open && row.Date > d.currentperiod
+                 @select {row.Product, row.Date, row.Amount}
                  @collect DataFrame
         end
         verbose && println("Setting all demands to zero")
@@ -71,10 +71,10 @@ function update_scheduling_models(d::SCSData; verbose=false)
             JuMP.setupperbound(D[k...], 0)
         end
         for k in 1:size(orders,1)
-            modeltime = max(1, Int(ceil((orders[k,:date]-d.currentperiod)/d.schedulingdiscretization)-1))
+            modeltime = max(1, Int(ceil((orders[k,:Date]-d.currentperiod)/d.schedulingdiscretization)-1))
             verbose && println("Setting order $(orders[k,:]) to $modeltime")
-            JuMP.setlowerbound(D[orders[k,:product], modeltime], orders[k,:amount])
-            JuMP.setupperbound(D[orders[k,:product], modeltime], orders[k,:amount])
+            JuMP.setlowerbound(D[orders[k,:Product], modeltime], orders[k,:Amount])
+            JuMP.setupperbound(D[orders[k,:Product], modeltime], orders[k,:Amount])
         end
         n += 1
     end
@@ -96,7 +96,7 @@ function saveschedule(n::Scheduling.Network)
 end
 
 
-function post_production_orders(d::SCSData)
+function post_production_orders(d::SCSData; verbose=true)
     for plant in d.plants
         n = 2
         m = getmodel(getnode(d.graph,n))

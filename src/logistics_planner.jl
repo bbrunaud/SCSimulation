@@ -5,11 +5,11 @@
 
 """=#
 
-@resumable function logistics_planner(d::SCSData)
+function logistics_planner(d::SCSData; verbose=true)
     if isempty(d.forecast)
-        initialize_orders(d)
+        initialize_orders(d, verbose=verbose)
     else
-        update_orders(d)
+        update_orders(d, verbose=verbose)
     end
 end
 

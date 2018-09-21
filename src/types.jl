@@ -2,7 +2,9 @@ mutable struct SCSData
     # Sets
     customers
     products
+    materials
     plants
+    units
     customersfor
     producttype
     # Planning
@@ -16,6 +18,7 @@ mutable struct SCSData
     consumptions
     productions
     maintenance
+    unitstatus
     # Scheduling
     schedulinghorizon
     schedulingdiscretization

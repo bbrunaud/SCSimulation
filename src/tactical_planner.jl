@@ -6,7 +6,7 @@
 
 """=#
 
-@resumable function tactical_planner(d::SCSData)
+function tactical_planner(d::SCSData; verbose=true)
     update_planning_model(d)
     update_scheduling_models(d)
     if d.iterations < Inf
