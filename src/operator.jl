@@ -10,16 +10,8 @@ function operator(d::SCSData; verbose=true)
 
     # Serve Deliveries
     servedeliveries(d, verbose=verbose)
-
-    #= Serve Deliveries
-    println("Serving Delivieries")
-    deliveries = @from row in d.deliveries begin
-                 @where row.Actual_Date == d.currentperiod
-                 @collect {row.Plant, row.Product, row.Amount, }
-    =#
-
-
 end
+
 
 function passinventory(d::SCSData; verbose=false)
     # Pass inventory to next period
@@ -46,9 +38,9 @@ function unload(d::SCSData; verbose=true)
     verbose && println("Offloading tasks: $finished")
     for order in finished[:Order]
         unloadorder(d, order, verbose=verbose)
-        iin = findin(order, d.orders[:Order])
+        iin = indexin([order], d.orders[:Order])[1]
         d.orders[iin,:Status] = :Finished
-        d.unitstatus[finished[iin,:Plant], finished[iin,:Unit]] = :Available
+        d.unitstatus[d.orders[iin,:Plant], d.orders[iin,:Unit]] = :Available
     end
 end
 
@@ -56,13 +48,14 @@ end
 function unloadorder(d::SCSData, order; verbose=verbose)
     finished = @from row in d.productions begin
                @where row.Order == order
-               @select {row.Order, row.Plant, row.Task, row.Unit, row.Amount}
+               @select {row.Order, row.Plant, row.Task, row.Unit, row.Material, row.Amount}
                @collect DataFrame
            end
     for k in 1:size(finished, 1)
         d.inventory[finished[k,:Plant], finished[k,:Material], d.currentperiod] += finished[k,:Amount]
     end
 end
+
 
 function executeproduction(d::SCSData; verbose=false)
     verbose && println("Checking for starting tasks")
@@ -144,8 +137,29 @@ end
 
 
 function servedeliveries(d::SCSData; verbose=false)
-
+    verbose && println("Checking for delivery events for $(d.currentperiod)")
+    deliveries = @from row in d.deliveries begin
+                @where row.ActualDate == d.currentperiod
+                @select {row.Number, row.Plant, row.Product, row.Amount}
+                @collect DataFrame
+            end
+    for k in 1:size(deliveries,1)
+        dnum = deliveries[k,:Number]
+        didx = indexin([dnum], d.deliveries[:Number])[1]
+        deliverable = min(d.inventory[deliveries[k,:Plant], deliveries[k,:Product], d.currentperiod], deliveries[k,:Amount])
+        d.delivieries[didx,:ActualAmount] = deliverable
+        if deliverable == deliveries[k,:Amount]
+            verbose && println("Delivery $dnum complete")
+            d.deliveries[didx,:Status] = :Complete
+        else
+            verbose && println("Backlog generated for delivery $dnum")
+            d.deliveries[didx,:Status] = :Backlog
+            d.deliveriesnum += 1
+            push!(d.deliveries, [d.deliveriesnum, deliveries[k,:Plant], deliveries[k,:Product], deliveries[k,:Amount]-deliverable, d.currentperiod + 168, 0, d.currentperiod + 168, :Open])
+        end
+    end
 end
+
 
 function maintenance(d::SCSData; verbose=false)
     verbose && println("Checking for repair events for $(d.currentperiod)")

@@ -70,7 +70,7 @@ d = SCSData([:C1],
             168,
             0,
             0,
-            DataFrame(Plant=[], Product=[], Amount=[], Date=[], Delivered=[], Actual_Date=[], Status=[]),
+            DataFrame(Number=[], Plant=[], Product=[], Amount=[], Date=[], Delivered=[], ActualDate=[], Status=[]),
             DataFrame(Order=[], Plant=[], Task=[], Unit=[], Start=[], Duration=[], End=[], Size=[], ActualStart=[], ActualDuration=[], ActualEnd=[], Perturbed=[], Status=[]),
             DataFrame(Number=[], Order=[], Plant=[], Task=[], Unit=[], Material=[], Amount=[]),
             DataFrame(Number=[], Order=[], Plant=[], Task=[], Unit=[], Material=[], Amount=[], ActualAmount=[]),
@@ -89,6 +89,7 @@ d = SCSData([:C1],
             0,
             1000000,
             1000,
-            1000)
+            1000,
+            2000)
 
-runsimu(d, verbose=true)
+runsimu(d, 500, verbose=true)

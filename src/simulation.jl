@@ -1,17 +1,20 @@
-function runsimu(d::SCSData; verbose=true)
-    for iter in 0:6
-        verbose && println("START SIMULATION HOUR $iter")
-        d.currentperiod = iter
-        if iter > 0
+function runsimu(d::SCSData, hours=6; verbose=true)
+    for h in 0:hours
+        verbose && println("START SIMULATION HOUR $h")
+        d.currentperiod = h
+        if h > 0
             maintenance(d, verbose=verbose)
             operator(d, verbose=verbose)
         end
-        if iter % 168 == 0
+        if h % 168 == 0
             verbose && println("START PLANNING PROCESS")
             demand_planner(d, verbose=verbose)
             logistics_planner(d, verbose=verbose)
-            tactical_planner(d, verbose=verbose)
-#            scheduler(d, verbose=verbose)
+            if h % 672 == 0
+	    	tactical_planner(d, verbose=verbose)
+#           else
+		scheduler(d, verbose=verbose)
+	    end
         end
     end
 end
