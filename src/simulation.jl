@@ -11,7 +11,7 @@ function runsimu(d::SCSData; verbose=true)
             demand_planner(d, verbose=verbose)
             logistics_planner(d, verbose=verbose)
             tactical_planner(d, verbose=verbose)
-            scheduler(d, verbose=verbose)
+#            scheduler(d, verbose=verbose)
         end
     end
 end

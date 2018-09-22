@@ -5,25 +5,11 @@ function operator(d::SCSData; verbose=true)
     # Offload Units
     unload(d, verbose=verbose)
 
-    # Load Units
+    # Current Production
+    executeproduction(d, verbose=verbose)
 
-    verbose && size(starting,1) > 0 && println("Starting tasks: $starting")
-
-    # Actual Production
-    if size(starting, 1) > 0
-        if unitavailable && inventoryavailable
-            ordernum = starting[1,:Order]
-            iin = indexin([ordernum], d.orders[:Order])[1]
-            d.orders[iin,:Status] = :Running
-            verbose && println("Order $ordernum set to running, $iin")
-            for k in 1:size(starting, 1)
-                d.unitstatus[starting[k,:Plant], starting[k,:Unit]] = :Busy
-                inventory[starting[k,:Plant], starting[k,:Material]] -= starting[k,:Amount]
-            end
-        else
-
-        end
-    end
+    # Serve Deliveries
+    servedeliveries(d, verbose=verbose)
 
     #= Serve Deliveries
     println("Serving Delivieries")
@@ -48,9 +34,9 @@ end
 
 function unload(d::SCSData; verbose=true)
     verbose && println("Checking for finished tasks")
-    finished = @from row in d.productions begin
-               @where row.ActualTime == d.currentperiod
-               @select {row.Number, row.Order, row.Plant, row.Task, row.Unit, row.Material, row.Amount}
+    finished = @from row in d.orders begin
+               @where row.ActualEnd == d.currentperiod
+               @select {row.Order, row.Plant, row.Task, row.Unit}
                @collect DataFrame
            end
     if size(finished, 1) == 0
@@ -58,21 +44,31 @@ function unload(d::SCSData; verbose=true)
         return true
     end
     verbose && println("Offloading tasks: $finished")
-    for k in 1:size(finished, 1)
-        ordernum = finished[k,:Order]
-        iin = findin(ordernum, d.orders[:Order])
+    for order in finished[:Order]
+        unloadorder(d, order, verbose=verbose)
+        iin = findin(order, d.orders[:Order])
         d.orders[iin,:Status] = :Finished
-        d.unitstatus[finished[k,:Plant], finished[k,:Unit]] = :Available
-        d.inventory[finished[k,:Plant], finished[k,:Material], d.currentperiod] += finished[k,:Amount]
+        d.unitstatus[finished[iin,:Plant], finished[iin,:Unit]] = :Available
     end
 end
 
+
+function unloadorder(d::SCSData, order; verbose=verbose)
+    finished = @from row in d.productions begin
+               @where row.Order == order
+               @select {row.Order, row.Plant, row.Task, row.Unit, row.Amount}
+               @collect DataFrame
+           end
+    for k in 1:size(finished, 1)
+        d.inventory[finished[k,:Plant], finished[k,:Material], d.currentperiod] += finished[k,:Amount]
+    end
+end
 
 function executeproduction(d::SCSData; verbose=false)
     verbose && println("Checking for starting tasks")
     starting = @from row in d.orders begin
                @where row.ActualStart == d.currentperiod
-               @select {row.Order, row.Plant, row.Task, row.Unit, row.Material, row.Amount}
+               @select {row.Order, row.Plant, row.Task, row.Unit}
                @collect DataFrame
            end
     if size(starting, 1) == 0
@@ -112,7 +108,7 @@ function orderpossible(d::SCSData, order; verbose=false)
                     @collect DataFrame
             end
     for k in 1:size(consumptions, 1)
-        if inventory[consumptions[k,:Plant], consumptions[k,:Material]] < consumptions[k,:Amount]
+        if d.inventory[consumptions[k,:Plant], consumptions[k,:Material], d.currentperiod] < consumptions[k,:Amount]
             verbose && println("Not enough inventory of material $(consumptions[k,:Material])")
             return false
         end
@@ -122,26 +118,34 @@ function orderpossible(d::SCSData, order; verbose=false)
 end
 
 
-function postponeorder(d::SCSData, ordernum; verbose=false)
-    verbose && println("Postponing Order $ordernum")
+function executeorder(d::SCSData, ordernum; verbose=false)
     iin = indexin([ordernum], d.orders[:Order])[1]
-    d.orders[iin,:Start] += 1
+    d.unitstatus[d.orders[iin,:Plant], d.orders[iin,:Unit]] = :Busy
+    d.orders[iin,:Status] = :Running
+    verbose && println("Order $ordernum set to running, $iin")
+    starting = @from row in d.consumptions begin
+                    @where row.Order == order
+                    @select {row.Plant, row.Material, row.Amount}
+                    @collect DataFrame
+            end
     for k in 1:size(starting, 1)
-        cnum = starting[k,:Number]
-        cidx = indexin([cnum], d.consumptions[:Number])[1]
-        d.consumptions[cidx, :ActualTime] += 1
-    end
-    prods = @from row in d.productions begin
-            @where row.Order == ordernum
-            @select {row.Number}
-            @collect DataFrame
-        end
-    for k in 1:size(prods,1)
-        pidx = indexin([prods[k,:Number]], d.productions[:Number])[1]
-        d.productions[pidx, :ActualTime] += 1
+        d.inventory[starting[k,:Plant], starting[k,:Material], d.currentperiod] -= starting[k,:Amount]
     end
 end
 
+
+function postponeorder(d::SCSData, ordernum; verbose=false)
+    verbose && println("Postponing Order $ordernum")
+    iin = indexin([ordernum], d.orders[:Order])[1]
+    d.orders[iin,:ActualStart] += 1
+    d.orders[iin,:ActualEnd] += 1
+    d.orders[iin,:Status] = :Postponed
+end
+
+
+function servedeliveries(d::SCSData; verbose=false)
+
+end
 
 function maintenance(d::SCSData; verbose=false)
     verbose && println("Checking for repair events for $(d.currentperiod)")
