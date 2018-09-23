@@ -19,6 +19,9 @@ tk = Dict(:P1 => :Tk_P1, :P2 => :Tk_P2)
 include("planning.jl")
 include("kondili.jl")
 initialinventory = Dict((:M1,i,0) => 50.0 for i in n.materials[n.name])
+for p in [:A, :B, :C]
+    initialinventory[:M1,p,0] = 20000
+end
 n.backlogpenalty = [1 for t in 1:n.periods]
 m = generatemodelUOPSS!(n, objective=[:minbacklog, :minbatches])
 JuMP.setsolver(m,GurobiSolver(MIPGap=0.1))
@@ -92,4 +95,4 @@ d = SCSData([:C1],
             1000,
             2000)
 
-runsimu(d, 500, verbose=true)
+#runsimu(d, 500, verbose=true)

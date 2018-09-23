@@ -147,15 +147,15 @@ function servedeliveries(d::SCSData; verbose=false)
         dnum = deliveries[k,:Number]
         didx = indexin([dnum], d.deliveries[:Number])[1]
         deliverable = min(d.inventory[deliveries[k,:Plant], deliveries[k,:Product], d.currentperiod], deliveries[k,:Amount])
-        d.delivieries[didx,:ActualAmount] = deliverable
+        d.deliveries[didx,:Delivered] = deliverable
         if deliverable == deliveries[k,:Amount]
             verbose && println("Delivery $dnum complete")
             d.deliveries[didx,:Status] = :Complete
         else
             verbose && println("Backlog generated for delivery $dnum")
             d.deliveries[didx,:Status] = :Backlog
-            d.deliveriesnum += 1
-            push!(d.deliveries, [d.deliveriesnum, deliveries[k,:Plant], deliveries[k,:Product], deliveries[k,:Amount]-deliverable, d.currentperiod + 168, 0, d.currentperiod + 168, :Open])
+            d.deliveriesnumber += 1
+            push!(d.deliveries, [d.deliveriesnumber, deliveries[k,:Plant], deliveries[k,:Product], deliveries[k,:Amount]-deliverable, d.currentperiod + 168, 0, d.currentperiod + 168, :Open])
         end
     end
 end
@@ -166,7 +166,7 @@ function maintenance(d::SCSData; verbose=false)
     # Start Repairs
     fails = @from row in d.maintenance begin
             @where row.Start == d.currentperiod
-            @select {row.Plant, row.Unit, row.End}
+            @select {row.Plant, row.Unit, row.Start, row.End}
             @collect DataFrame
         end
     if size(fails,1) == 0

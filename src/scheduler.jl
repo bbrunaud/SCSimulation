@@ -46,6 +46,7 @@ function update_scheduling_models(d::SCSData; verbose=false)
                     pt = tmapr[planperiod]
                     verbose && println("pt = $pt,  st = $st, planperiod=$planperiod")
                     for p in d.products
+			verbose && println("Setting Inventory target for product $p to $(JuMP.getvalue(pinv[i,p,pt]))")    
                         JuMP.setlowerbound(invtgt[Symbol("Tk_",p),p,st], JuMP.getvalue(pinv[i,p,pt]))
                         JuMP.setupperbound(invtgt[Symbol("Tk_",p),p,st], JuMP.getvalue(pinv[i,p,pt]))
                     end
@@ -54,6 +55,17 @@ function update_scheduling_models(d::SCSData; verbose=false)
             n += 1
         end
     end
+    # Update Initial Inventory
+    for i in d.plants
+        n = 2
+	m = getmodel(getnode(d.graph, n))
+	inv = getindex(m, :inv)
+	for p in d.materials
+	    setlowerbound(inv[Symbol("Tk_",p),p,-1], d.inventory[i,p,d.currentperiod])
+	    setupperbound(inv[Symbol("Tk_",p),p,-1], d.inventory[i,p,d.currentperiod])
+    	end
+	n += 1
+    end	
     # Add orders
     for i in d.plants
         n = 2
@@ -61,7 +73,7 @@ function update_scheduling_models(d::SCSData; verbose=false)
         D = getindex(m, :D)
 
         orders = @from row in d.deliveries begin
-                 @where row.Plant == i && row.Status == :open && row.Date > d.currentperiod
+                 @where row.Plant == i && row.Status == :Open && row.Date > d.currentperiod
                  @select {row.Product, row.Date, row.Amount}
                  @collect DataFrame
         end
