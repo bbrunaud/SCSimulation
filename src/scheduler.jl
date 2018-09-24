@@ -20,9 +20,14 @@ function update_scheduling_models(d::SCSData; verbose=false)
             n = 2
             m = getmodel(getnode(d.graph,n))
             invtgt = getindex(m, :invtgt)
+            prodtgt = getindex(m, :prodtgt)
             for k in keys(invtgt)
-                setlowerbound(invtgt[k...], 0)
-                setupperbound(invtgt[k...], Inf)
+                JuMP.setlowerbound(invtgt[k...], 0)
+                JuMP.setupperbound(invtgt[k...], Inf)
+            end
+            for k in keys(prodtgt)
+                JuMP.setlowerbound(prodtgt[k...], 0)
+                JuMP.setupperbound(prodtgt[k...], Inf)
             end
             n += 1
         end
@@ -32,12 +37,18 @@ function update_scheduling_models(d::SCSData; verbose=false)
             n = 2
             m = getmodel(getnode(d.graph,n))
             invtgt = getindex(m, :invtgt)
+            prodtgt = getindex(m, :prodtgt)
             for k in keys(invtgt)
                 JuMP.setlowerbound(invtgt[k...], 0)
                 JuMP.setupperbound(invtgt[k...], Inf)
             end
+            for k in keys(prodtgt)
+                JuMP.setlowerbound(prodtgt[k...], 0)
+                JuMP.setupperbound(prodtgt[k...], Inf)
+            end
             pm = getmodel(getnode(d.graph,1))
             pinv = getindex(pm, :inv)
+            x = getindex(pm, :x)
             tmapr = map(reverse, pm.ext[:periodmap])
             for k in 1:Int(d.schedulinghorizon/168)
                 planperiod = (d.currentperiod + 168*k)
@@ -46,26 +57,16 @@ function update_scheduling_models(d::SCSData; verbose=false)
                     pt = tmapr[planperiod]
                     verbose && println("pt = $pt,  st = $st, planperiod=$planperiod")
                     for p in d.products
-			verbose && println("Setting Inventory target for product $p to $(JuMP.getvalue(pinv[i,p,pt]))")    
                         JuMP.setlowerbound(invtgt[Symbol("Tk_",p),p,st], JuMP.getvalue(pinv[i,p,pt]))
                         JuMP.setupperbound(invtgt[Symbol("Tk_",p),p,st], JuMP.getvalue(pinv[i,p,pt]))
+                        JuMP.setlowerbound(prodtgt[p,Int(st*d.schedulingdiscretization/168)], JuMP.getvalue(x[i,p,pt]))
+                        JuMP.setupperbound(prodtgt[p,Int(st*d.schedulingdiscretization/168)], JuMP.getvalue(x[i,p,pt]))
                     end
                 end
             end
             n += 1
         end
     end
-    # Update Initial Inventory
-    for i in d.plants
-        n = 2
-	m = getmodel(getnode(d.graph, n))
-	inv = getindex(m, :inv)
-	for p in d.materials
-	    setlowerbound(inv[Symbol("Tk_",p),p,-1], d.inventory[i,p,d.currentperiod])
-	    setupperbound(inv[Symbol("Tk_",p),p,-1], d.inventory[i,p,d.currentperiod])
-    	end
-	n += 1
-    end	
     # Add orders
     for i in d.plants
         n = 2
