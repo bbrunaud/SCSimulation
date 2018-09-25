@@ -120,16 +120,14 @@ monolith_to_graph(mf, d.graph)
 m = getmodel(getnode(d.graph,1))
 
 @test m.colVal[1] != NaN
+post_production_orders(d, verbose=true)
 
 d.currentperiod = 168
 for p in n.materials[n.name]
 	d.inventory[:M1,p,168] = d.inventory[:M1,p,0]
 end
 
-update_forecast(d, verbose=true)
-update_orders(d, verbose=true)
-update_scheduling_models(d, verbose=true)
-#status = solve(sm)
-
+logistics_planner(d, verbose=true)
+scheduler(d, verbose=true)
 
 #@test status == :Optimal
