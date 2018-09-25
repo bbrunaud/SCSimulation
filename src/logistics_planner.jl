@@ -35,7 +35,7 @@ function initialize_orders(d::SCSData, ts=d.currentperiod + 1, te=ts+335; verbos
             for k in 1:slots
                 verbose && println("Generating Delivery orders for plant $i and product $p for $(Q[k]) to be picked on period $(t[k])")
                 d.deliverynumber += 1
-                push!(d.deliveries, [d.deliverynumber,i,p,Q[k],t[k], 0, t[k], :Open])
+                push!(d.deliveries, [d.deliverynumber,i,p,Q[k],t[k], 0, t[k], false, :Open])
             end
         end
     end

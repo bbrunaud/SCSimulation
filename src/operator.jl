@@ -1,4 +1,7 @@
 function operator(d::SCSData; verbose=true)
+    # Perturb orders and deliveries
+    applyuncertainty(d, [:Orders, :Deliveries])
+
     # Pass Inventory
     passinventory(d, verbose=verbose)
 
@@ -143,6 +146,10 @@ function servedeliveries(d::SCSData; verbose=false)
                 @select {row.Number, row.Plant, row.Product, row.Amount}
                 @collect DataFrame
             end
+    if size(deliveries,1) == 0
+        verbose && println("No deliveries for today")
+        return true
+    end
     for k in 1:size(deliveries,1)
         dnum = deliveries[k,:Number]
         didx = indexin([dnum], d.deliveries[:Number])[1]
@@ -191,5 +198,40 @@ function maintenance(d::SCSData; verbose=false)
     verbose && println("Today's fails are $repairs")
     for k in 1:size(repairs,1)
         d.unitstatus[repairs[k,:Plant],repairs[k,:Unit]] = :Available
+    end
+end
+
+
+function applyuncertainty(d::SCSData, perturbed=[:Orders]; verbose=false)
+    if :Orders in perturbed
+        for k in 1:size(d.orders,1)
+            if !d.orders[k,:Perturbed]
+                verbose && println("Perturbing order $(d.orders[k,:Order])")
+                d.orders[k,:Perturbed] = true
+                num = rand()
+                if num > 0.95
+                    d.orders[k,:ActualEnd] += 2
+                    d.orders[k,:ActualDuration] += 2
+                    verbose && println("Order end increased in 2 hours")
+                elseif num > 0.9
+                    d.orders[k,:ActualEnd] -= 1
+                    d.orders[k,:ActualDuration] -= 1
+                    verbose && println("Order end reduced in 1 hour")
+                elseif num > 0.8
+                    d.orders[k,:ActualEnd] += 1
+                    d.orders[k,:ActualDuration] += 1
+                    verbose && println("Order end increased in 1 hour")
+                end
+            end
+        end
+    end
+    if :Deliveries in perturbed
+        for k in 1:size(d.deliveries,1)
+            if !d.deliveries[k,:Perturbed]
+                d.deliveries[k,:Perturbed] = true
+                delay = Normal(0,5)
+                d.deliveries[k,:ActualDate] += Int(round(rand(delay),0))
+            end
+        end
     end
 end
