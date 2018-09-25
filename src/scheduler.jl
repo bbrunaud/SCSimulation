@@ -67,6 +67,17 @@ function update_scheduling_models(d::SCSData; verbose=false)
             n += 1
         end
     end
+    # Update initial inventory
+    for i in d.plants
+	n = 2
+        m = getmodel(getnode(d.graph,n))
+        inv = getindex(m, :inv)
+	for p in d.materials
+	    setlowerbound(inv[Symbol("Tk_",p),p,-1],d.inventory[i,p,d.currentperiod])
+	    setupperbound(inv[Symbol("Tk_",p),p,-1],d.inventory[i,p,d.currentperiod])
+	end
+	n += 1
+    end
     # Add orders
     for i in d.plants
         n = 2
@@ -91,6 +102,35 @@ function update_scheduling_models(d::SCSData; verbose=false)
         end
         n += 1
     end
+    # Update unavailable equipment
+    for i in d.plants
+		n = 2
+		m = getmodel(getnode(d.graph,n))
+		net = getattribute(getnode(d.graph,n),:network)
+		su = getindex(m, :su)
+		for k in keys(su)
+			setupperbound(su[k...], 1)
+		end
+		for unit in net.units
+			if d.unitstatus[i,unit] == :Repair
+				rtdf = @from row in d.maintenance begin
+					   @where row.Plant == i && row.Unit == unit
+					   @select {row.End}
+					   @collect DataFrame
+			   end
+			   verbose && println("Making Unit $unit Unavailable in the scheduling model")
+			   repairtime = rtdf[1,1]
+			   repairperiod = Int(ceil((repairtime - d.currentperiod - 1)/d.schedulingdiscretization))
+			   for t in 1:repairperiod
+				   for j in net.tasks[unit]
+			   			setupperbound(su[unit,j,t], 0)
+				   end
+		 	   end
+		    	end
+		 end
+		n += 1
+	end
+	
 end
 
 function saveschedule(n::Scheduling.Network)

@@ -33,4 +33,3 @@ function planning()
 
 end
 
-pm = planning()

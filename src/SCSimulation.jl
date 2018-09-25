@@ -9,6 +9,7 @@ using PlasmoAlgorithms
 using DataFrames
 using Query
 using Scheduling
+using Gurobi
 
 export SCSData, Delivery,
         # Demand Planner

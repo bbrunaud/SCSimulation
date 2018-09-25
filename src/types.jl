@@ -29,6 +29,7 @@ mutable struct SCSData
     forecastvariation
     forecastvariationpercent
     # Models
+    graphfunction
     graph
     inventory
     iterations

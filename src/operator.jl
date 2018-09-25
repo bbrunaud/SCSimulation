@@ -176,9 +176,7 @@ function maintenance(d::SCSData; verbose=false)
             @select {row.Plant, row.Unit, row.Start, row.End}
             @collect DataFrame
         end
-    if size(fails,1) == 0
-        return true
-    end
+    if size(fails,1) > 0
     verbose && println("Today's fails are $fails")
     for k in 1:size(fails,1)
         if d.unitstatus[fails[k,:Plant],fails[k,:Unit]] == :Available
@@ -189,14 +187,16 @@ function maintenance(d::SCSData; verbose=false)
             fails[k,:End] += 1
         end
     end
+    end
     # End Repairs
     repairs = @from row in d.maintenance begin
             @where row.End == d.currentperiod
             @select {row.Plant, row.Unit, row.Start, row.End}
             @collect DataFrame
         end
-    verbose && println("Today's fails are $repairs")
+    verbose && println("Today's repairs are $repairs")
     for k in 1:size(repairs,1)
+	verbose && println("Unit $(repairs[k,:Unit]) repaired")
         d.unitstatus[repairs[k,:Plant],repairs[k,:Unit]] = :Available
     end
 end

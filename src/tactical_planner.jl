@@ -20,6 +20,7 @@ end
 
 
 function update_planning_model(d)
+    d.graph = d.graphfunction()
     # Assuming the first node is the planning model
     node = getnode(d.graph,1)
     m = getmodel(node)

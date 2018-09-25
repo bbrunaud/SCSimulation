@@ -7,7 +7,7 @@ using JuMP
 using Distributions
 
 
-#srand(12345)
+srand(12345)
 
 fcast_μ = Dict((:C1,i) => 100 for i in [:P1,:P2])
 fcast_σ = Dict((:C1,i) => 20 for i in [:P1,:P2])
@@ -20,14 +20,16 @@ include("planning.jl")
 include("kondili.jl")
 initialinventory = Dict((:M1,i,0) => 50.0 for i in n.materials[n.name])
 for p in [:A, :B, :C]
-    initialinventory[:M1,p,0] = 20000
+    initialinventory[:M1,p,0] = 2e8
 end
 n.backlogpenalty = [1 for t in 1:n.periods]
+
+function graphgen()
+g = ModelGraph()
 m = generatemodelUOPSS!(n, objective=[:minbacklog, :minbatches])
 JuMP.setsolver(m,GurobiSolver(MIPGap=0.1))
-
-g = ModelGraph()
 Plasmo.setsolver(g, GurobiSolver(MIPGap=0.1))
+pm = planning()
 n1 = add_node(g, pm)
 n2 = add_node(g, m)
 setattribute(n2,:network, n)
@@ -40,6 +42,10 @@ setattribute(n2,:coefftable, ct)
 add_edge(g, n1, n2)
 @linkconstraint(g, [p in products, t in periods], n1[:inv][:M1,p,t] == n2[:invtgt][tk[p],p,42t])
 @linkconstraint(g, [p in products, t in periods], n1[:x][:M1,p,t] == n2[:prodtgt][p,t])
+return g
+end
+
+g = graphgen()
 
 # Generate Fails
 fails = DataFrame(Plant=[], Unit=[], Start=[], End=[])
@@ -62,8 +68,9 @@ end
 
 unitstatus = Dict((:M1, u) => :Available for u in n.units)
 
+
 d = SCSData([:C1],
-            pm.ext[:products],
+            [:P1, :P2],
             n.materials[n.name],
             [:M1],
             Dict(:M1 => n.units),
@@ -86,7 +93,8 @@ d = SCSData([:C1],
             fcast_σ,
             0.5,
             0.4,
-            g,
+	    graphgen,
+	    g,
             initialinventory,
             1,
             0,
@@ -95,4 +103,4 @@ d = SCSData([:C1],
             1000,
             2000)
 
-#runsimu(d, 500, verbose=true)
+#runsimu(d, 3000, verbose=true)
