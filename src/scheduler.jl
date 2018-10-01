@@ -10,6 +10,7 @@ function scheduler(d::SCSData; verbose=verbose)
     for i in 2:length(getnodes(d.graph))
         JuMP.solve(getmodel(getnode(d.graph,i)))
     end
+    adjust_plan(d,verbose=verbose)
     post_production_orders(d, verbose=verbose)
 end
 
@@ -67,6 +68,15 @@ function update_scheduling_models(d::SCSData; verbose=false)
             n += 1
         end
     end
+    # Release linkvars
+    for i in d.plants
+	n = 2
+	node = getnode(d.graph,n)
+	linkvars = getattribute(node,:xinvars)
+	setlowerbound.(linkvars,0)
+	setupperbound.(linkvars,Inf)
+	n += 1
+    end
     # Update initial inventory
     for i in d.plants
 	n = 2
@@ -85,9 +95,12 @@ function update_scheduling_models(d::SCSData; verbose=false)
         D = getindex(m, :D)
 
         orders = @from row in d.deliveries begin
-                 @where row.Plant == i && row.Status == :Open && row.Date > d.currentperiod
-                 @select {row.Product, row.Date, row.Amount}
+		@where row.Plant == i && (row.Status == :Open || row.Status == :Backlog) && row.Date > d.currentperiod
+                 @select {row.Number, row.Product, row.Date, row.Amount}
                  @collect DataFrame
+        end
+	if size(orders,1) > 0 && verbose
+	    println("Orders collected $orders")
         end
         verbose && println("Setting all demands to zero")
         for k in keys(D)
@@ -97,6 +110,7 @@ function update_scheduling_models(d::SCSData; verbose=false)
         for k in 1:size(orders,1)
             modeltime = max(1, Int(ceil((orders[k,:Date]-d.currentperiod)/d.schedulingdiscretization)-1))
             verbose && println("Setting order $(orders[k,:]) to $modeltime")
+	    d.ordermap[i, orders[k,:Product], modeltime] = orders[k,:Number] 
             JuMP.setlowerbound(D[orders[k,:Product], modeltime], orders[k,:Amount])
             JuMP.setupperbound(D[orders[k,:Product], modeltime], orders[k,:Amount])
         end
@@ -195,3 +209,24 @@ function post_production_orders(d::SCSData; verbose=true)
         n += 1
     end
 end
+
+
+function adjust_plan(d::SCSData; verbose=false)
+  for i in d.plants
+      n = 2
+      m = getmodel(getnode(d.graph,n))
+      bl = getindex(m,:bl)
+      for (s,t) in keys(bl)
+	 blv = JuMP.getvalue(bl[s,t])
+	 if blv > 1e-8
+             dnum = d.ordermap[i,s,t]
+	     didx = indexin([dnum],d.deliveries[:Number])[1]
+	     d.deliveries[didx,:Amount] -= blv
+	     verbose && println("Adjusting $blv from order $(d.deliveries[didx,:Number])")
+	     d.profit += 0.8*d.price[d.deliveries[didx,:Product]]*blv
+         end
+      end
+  n += 1
+  end
+end
+

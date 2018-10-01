@@ -11,13 +11,13 @@ using Query
 using Scheduling
 using Gurobi
 
-export SCSData, Delivery,
+export SCSData, SimuRun,
         # Demand Planner
         demand_planner, initialize_forecast, update_forecast,
         # Logistics Planner
         logistics_planner, initialize_orders, update_orders,
         # Tactical Planner
-        tactical_planner, update_planning_model, monolith_to_graph,
+        tactical_planner, update_planning_model, monolith_to_graph, update_monolith,
         # Scheduler
         scheduler, update_scheduling_models, post_production_orders,
         # Operator

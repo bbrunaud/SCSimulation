@@ -9,8 +9,8 @@ using Distributions
 
 srand(12345)
 
-fcast_μ = Dict((:C1,i) => 100 for i in [:P1,:P2])
-fcast_σ = Dict((:C1,i) => 20 for i in [:P1,:P2])
+fcast_μ = Dict((:C1,i) => 3500 for i in [:P1,:P2])
+fcast_σ = Dict((:C1,i) => 1000 for i in [:P1,:P2])
 custfor = Dict(:M1 => [:C1])
 ptype = Dict(:P1 => :MTS,
              :P2 => :MTS)
@@ -27,6 +27,7 @@ n.backlogpenalty = [1 for t in 1:n.periods]
 function graphgen()
 g = ModelGraph()
 m = generatemodelUOPSS!(n, objective=[:minbacklog, :minbatches])
+solver = GurobiSolver(MIPGap=0.1)
 JuMP.setsolver(m,GurobiSolver(MIPGap=0.1))
 Plasmo.setsolver(g, GurobiSolver(MIPGap=0.1))
 pm = planning()
@@ -42,6 +43,12 @@ setattribute(n2,:coefftable, ct)
 add_edge(g, n1, n2)
 @linkconstraint(g, [p in products, t in periods], n1[:inv][:M1,p,t] == n2[:invtgt][tk[p],p,42t])
 @linkconstraint(g, [p in products, t in periods], n1[:x][:M1,p,t] == n2[:prodtgt][p,t])
+@linkconstraint(g, [p in products, t in periods], n1[:udt][p,t] == n2[:trd][p,t])
+
+mf = create_jump_graph_model(g)
+mf.solver = solver
+setattribute(g, :monolith, mf)
+
 return g
 end
 
@@ -76,6 +83,7 @@ d = SCSData([:C1],
             Dict(:M1 => n.units),
             custfor,
             ptype,
+	    n.price,
             1344,
             168,
             0,
@@ -86,6 +94,7 @@ d = SCSData([:C1],
             DataFrame(Number=[], Order=[], Plant=[], Task=[], Unit=[], Material=[], Amount=[], ActualAmount=[]),
             fails,
             unitstatus,
+	    Dict(),
             1344,
             4,
             Dict(),
@@ -97,10 +106,12 @@ d = SCSData([:C1],
 	    g,
             initialinventory,
             1,
+	    Float64[],
             0,
             1000000,
             1000,
             1000,
-            2000)
+            2000,
+	    0)
 
 #runsimu(d, 3000, verbose=true)

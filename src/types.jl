@@ -7,6 +7,7 @@ mutable struct SCSData
     units
     customersfor
     producttype
+    price
     # Planning
     planninghorizon
     planningdiscretization
@@ -19,6 +20,7 @@ mutable struct SCSData
     productions
     maintenance
     unitstatus
+    ordermap
     # Scheduling
     schedulinghorizon
     schedulingdiscretization
@@ -33,10 +35,31 @@ mutable struct SCSData
     graph
     inventory
     iterations
-    # Time
+    # Control
+    gaps
     currentperiod
     ordernumber
     deliverynumber
     consumptionnumber
     productionnumber
+    profit
 end
+
+mutable struct SimuRun
+	name
+	description
+	seed
+	hours
+	clocktime
+	orders
+	deliveries
+	gaps
+	profit
+	averagegap
+	averageinventory
+end
+
+function SimuRun(name,description,seed,hours)
+	return SimuRun(name,description,seed,hours,0,nothing,nothing,Float64[],0,0,0)
+end
+

@@ -8,19 +8,23 @@
 
 function tactical_planner(d::SCSData; verbose=true)
     update_planning_model(d)
-    update_scheduling_models(d)
+    update_scheduling_models(d, verbose=verbose)
     if d.iterations < Inf
-        bendersolve(d.graph, max_iterations=d.iterations)
+        res = bendersolve(d.graph, max_iterations=d.iterations)
+	push!(d.gaps, res.gap)
     else
+	update_monolith(d)
         JuMP.solve(getattribute(d.graph,:monolith))
         monolith_to_graph(d)
     end
-    post_production_orders(d)
+   # adjust_plan(d, verbose=verbose)
+    post_production_orders(d, verbose=verbose)
 end
 
 
 function update_planning_model(d)
     d.graph = d.graphfunction()
+    PlasmoAlgorithms.bdprepare(d.graph)
     # Assuming the first node is the planning model
     node = getnode(d.graph,1)
     m = getmodel(node)
@@ -48,6 +52,12 @@ function update_planning_model(d)
             end
         end
     end
+end
+
+function update_monolith(d::SCSData)
+    mf = create_jump_graph_model(d.graph)
+    mf.solver =  getsolver(d.graph)
+    setattribute(d.graph, :monolith, mf)
 end
 
 """

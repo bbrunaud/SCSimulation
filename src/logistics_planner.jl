@@ -6,7 +6,7 @@
 """=#
 
 function logistics_planner(d::SCSData; verbose=true)
-    if isempty(d.forecast)
+    if size(d.deliveries,1) == 0
         initialize_orders(d, verbose=verbose)
     else
         update_orders(d, verbose=verbose)
@@ -24,7 +24,7 @@ function initialize_orders(d::SCSData, ts=d.currentperiod + 1, te=ts+335; verbos
             forecast = sum(d.forecast[c,p,ts+d.planningdiscretization*i-1] for c in d.customersfor[i] for i in 1:iterend+1)
             actualamount = forecast*rand(0.8:0.01:1.2)
             verbose && println("Forecast is $forecast, Actual amount is $actualamount")
-            slots = rand(1:3(iterend+1)) #TODO Number of slots needs to be a function of the length
+            slots = rand(1:3(iterend+1)) 
             perm  = randperm(te-ts+1) .+ (ts-1)
             #verbose && println("Possible periods are $perm")
             t = perm[1:slots]

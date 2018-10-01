@@ -138,7 +138,6 @@ function postponeorder(d::SCSData, ordernum; verbose=false)
     d.orders[iin,:Status] = :Postponed
 end
 
-
 function servedeliveries(d::SCSData; verbose=false)
     verbose && println("Checking for delivery events for $(d.currentperiod)")
     deliveries = @from row in d.deliveries begin
@@ -157,12 +156,19 @@ function servedeliveries(d::SCSData; verbose=false)
         d.deliveries[didx,:Delivered] = deliverable
         if deliverable == deliveries[k,:Amount]
             verbose && println("Delivery $dnum complete")
-            d.deliveries[didx,:Status] = :Complete
+	    if d.deliveries[didx,:Status] == :Backlog
+		 d.profit += 0.9*d.price[deliveries[k,:Product]]*deliverable
+            else
+                 d.profit += d.price[deliveries[k,:Product]]*deliverable
+            end
+	    d.deliveries[didx,:Status] = :Complete
+
         else
             verbose && println("Backlog generated for delivery $dnum")
-            d.deliveries[didx,:Status] = :Backlog
-            d.deliveriesnumber += 1
-            push!(d.deliveries, [d.deliveriesnumber, deliveries[k,:Plant], deliveries[k,:Product], deliveries[k,:Amount]-deliverable, d.currentperiod + 168, 0, d.currentperiod + 168, :Open])
+            d.deliveries[didx,:Status] = :Partial
+	    d.profit +=  0.9*d.price[deliveries[k,:Product]]*deliverable
+            d.deliverynumber += 1
+            push!(d.deliveries, [d.deliverynumber, deliveries[k,:Plant], deliveries[k,:Product], deliveries[k,:Amount]-deliverable, d.currentperiod + 168, 0, d.currentperiod + 168, false, :Backlog])
         end
     end
 end
