@@ -21,22 +21,24 @@ function initialize_orders(d::SCSData, ts=d.currentperiod + 1, te=ts+335; verbos
             verbose && println("ts = $ts, te = $te")
             iterend = Int(((te-ts+1)/d.planningdiscretization - 1))
             verbose && println("ts = $ts, te = $te, Iter End = $iterend")
-            forecast = sum(d.forecast[c,p,ts+d.planningdiscretization*i-1] for c in d.customersfor[i] for i in 1:iterend+1)
-            actualamount = forecast*rand(0.8:0.01:1.2)
-            verbose && println("Forecast is $forecast, Actual amount is $actualamount")
-            slots = rand(1:3(iterend+1)) 
-            perm  = randperm(te-ts+1) .+ (ts-1)
-            #verbose && println("Possible periods are $perm")
-            t = perm[1:slots]
-            Q = [actualamount/slots*rand(0.8:0.01:1.2) for _ in 1:slots]
-            if d.producttype[p] == :MTS
-                Q[end] = max(forecast,actualamount) - sum(Q[1:end-1])
-            end
-            for k in 1:slots
-                verbose && println("Generating Delivery orders for plant $i and product $p for $(Q[k]) to be picked on period $(t[k])")
-                d.deliverynumber += 1
-                push!(d.deliveries, [d.deliverynumber,i,p,Q[k],t[k], 0, t[k], false, :Open])
-            end
+	    for j in 1:iterend+1
+		    forecast = sum(d.forecast[c,p,ts+d.planningdiscretization*j-1] for c in d.customersfor[i])
+        	    actualamount = forecast*rand(0.8:0.01:1.2)
+	            verbose && println("Forecast is $forecast, Actual amount is $actualamount")
+        	    slots = rand(1:4) 
+	            perm  = randperm(te-ts+1) .+ (ts-1)
+        	    #verbose && println("Possible periods are $perm")
+	            t = perm[1:slots]
+        	    Q = [actualamount/slots*rand(0.8:0.01:1.2) for _ in 1:slots]
+	            if d.producttype[p] == :MTS
+        	        Q[end] = max(forecast,actualamount) - sum(Q[1:end-1])
+	            end
+        	    for k in 1:slots
+                	verbose && println("Generating Delivery orders for plant $i and product $p for $(Q[k]) to be picked on period $(t[k])")
+	                d.deliverynumber += 1
+        	        push!(d.deliveries, [d.deliverynumber,i,p,Q[k],t[k], 0, t[k], false, :Open])
+	            end
+	    end
         end
     end
 end

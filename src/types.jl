@@ -57,9 +57,10 @@ mutable struct SimuRun
 	profit
 	averagegap
 	averageinventory
+	backlogamount
+	backlognumber
 end
 
 function SimuRun(name,description,seed,hours)
-	return SimuRun(name,description,seed,hours,0,nothing,nothing,Float64[],0,0,0)
+	return SimuRun(name,description,seed,hours,0,nothing,nothing,Float64[],0,0,0,0,0)
 end
-

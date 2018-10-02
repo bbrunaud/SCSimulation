@@ -30,6 +30,20 @@ function runsimu(d::SCSData, hours=6; seed=12345, name="", description="", verbo
     r.clocktime = toc()
     r.profit = d.profit
     r.averagegap = mean(r.gaps)
-    r.averageinventory = mean([mean(d.inventory[i,p,t] for t in 1:d.currentperiod) for i in d.plants for p in d.products])
+    r.averageinventory = mean([mean(d.inventory[i,p,t] for t in 1:r.hours) for i in d.plants for p in d.products])
+
+    partial = @from i in r.deliveries begin
+              @where i.Status == :Partial
+              @select {i.Amount, i.Delivered}
+              @collect DataFrame
+          end
+    numberofbacklogs = size(partial,1)
+    numberofdeliveries = size(r.deliveries,1)
+
+    backlogamount = sum(partial[:Amount] - partial[:Delivered])
+    deliveredamount = sum(r.deliveries[:Amount])
+
+    r.backlogamount = backlogamount / deliveredamount
+    r.backlognumber = numberofbacklogs / numberofdeliveries
     return r
 end

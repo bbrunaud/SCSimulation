@@ -13,11 +13,9 @@ function tactical_planner(d::SCSData; verbose=true)
         res = bendersolve(d.graph, max_iterations=d.iterations)
 	push!(d.gaps, res.gap)
     else
-	update_monolith(d)
-        JuMP.solve(getattribute(d.graph,:monolith))
-        monolith_to_graph(d)
+        Plasmo.solve(d.graph)
     end
-   # adjust_plan(d, verbose=verbose)
+    adjust_plan(d, verbose=verbose)
     post_production_orders(d, verbose=verbose)
 end
 
