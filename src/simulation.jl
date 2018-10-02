@@ -45,5 +45,6 @@ function runsimu(d::SCSData, hours=6; seed=12345, name="", description="", verbo
 
     r.backlogamount = backlogamount / deliveredamount
     r.backlognumber = numberofbacklogs / numberofdeliveries
+    r.totaldelivered = deliveredamount
     return r
 end
