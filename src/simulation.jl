@@ -1,25 +1,28 @@
 function runsimu(d::SCSData, hours=6; seed=12345, name="", description="", verbose=true)
+	println("#### BEGIN SIMULATION ####")
 	t = tic()
 	srand(seed)
 	r = SimuRun(name,description,seed,hours)
     for h in 0:hours
-        verbose && println("START SIMULATION HOUR $h")
         d.currentperiod = h
         if h > 0
             maintenance(d, verbose=verbose)
             operator(d, verbose=verbose)
         end
-        if h % 168 == 0
-            verbose && println("START PLANNING PROCESS")
+        if h % 168 == 0	  
+		println("START SIMULATION WEEK $(Int(h/168+1))")
             demand_planner(d, verbose=verbose)
             logistics_planner(d, verbose=verbose)
             if h % 672 == 0
+		println("PLANNING . . .")
 	    	tactical_planner(d, verbose=verbose)
             else
+		println("SCHEDULING . . .")
 		scheduler(d, verbose=verbose)
 	    end
         end
     end
+    println("SAVING DATA")
     r.name = name
     r.description = description
     r.seed = seed
