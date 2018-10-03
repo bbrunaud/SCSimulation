@@ -5,7 +5,7 @@ using Scheduling
 using Plasmo
 using JuMP
 using Distributions
-
+using JLD
 
 include("planning.jl")
 include("kondili.jl")
@@ -119,5 +119,24 @@ d = SCSData([:C1],
 return d
 end
 
-d = gensimu()
-#runsimu(d, 3000, verbose=true)
+function mrun(d, seed)
+	r = runsimu(d, 168*52, seed=seed, name="Kondili", description="Full,Production,Inf")
+	r
+end
+
+
+ar = []
+#=
+for i in 20:30
+	println("")
+	println(" ############### RUN  $i  ################")
+	println("")
+	println("GENERATING SIMULATION OBJECT")
+	d = gensimu()
+	println("RUNNING SIMULATION")
+	r = mrun(d, 1000i)
+	println("SAVING")
+	push!(ar, r)
+	save("thirdrun.jld","ar",ar)
+end
+=#

@@ -53,15 +53,18 @@ mutable struct SimuRun
 	clocktime
 	orders
 	deliveries
+	inventory
 	gaps
 	profit
 	averagegap
 	averageinventory
+	utilization
 	backlogamount
 	backlognumber
 	totaldelivered
+	deliveredperhour
 end
 
 function SimuRun(name,description,seed,hours)
-	return SimuRun(name,description,seed,hours,0,nothing,nothing,Float64[],0,0,0,0,0,0)
+	return SimuRun(name,description,seed,hours,0,nothing,nothing,nothing,Float64[],0,0,0,0,0,0,0,0)
 end

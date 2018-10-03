@@ -3,6 +3,8 @@ using DataFrames
 
 include("test_simulation.jl")
 
+srand(12345)
+
 d.iterations = Inf
 demand_planner(d)
 logistics_planner(d)
@@ -16,7 +18,7 @@ mf.solver = GurobiSolver(MIPGap=0.01)
 solve(mf)
 monolith_to_graph(mf,d.graph)
 =#
-Plasmo.setsolver(d.graph, GurobiSolver(MIPGap=0.01))
+Plasmo.setsolver(d.graph, GurobiSolver(MIPGap=0.005))
 solve(d.graph)
 
 m1 = getmodel(getnode(d.graph,1))

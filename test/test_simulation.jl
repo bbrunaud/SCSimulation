@@ -27,9 +27,9 @@ n.backlogpenalty = [1 for t in 1:n.periods]
 function graphgen()
 g = ModelGraph()
 m = generatemodelUOPSS!(n, objective=[:minbacklog, :minbatches])
-solver = GurobiSolver(MIPGap=0.1)
-JuMP.setsolver(m,GurobiSolver(MIPGap=0.1))
-Plasmo.setsolver(g, GurobiSolver(MIPGap=0.1))
+solver = GurobiSolver(MIPGap=0.01)
+JuMP.setsolver(m,solver)
+Plasmo.setsolver(g, solver)
 pm = planning()
 n1 = add_node(g, pm)
 n2 = add_node(g, m)
@@ -115,3 +115,19 @@ d = SCSData([:C1],
 	    0)
 
 #runsimu(d, 3000, verbose=true)
+
+function cs()
+	          cost(m1, :sales)
+		            cost(m1, :redirected)
+			              cost(m2, :profit)
+				                cost(m2, :backlogcost)
+						          cost(m2, :batchpenalty)
+							            cost(m2, :slack_prod)
+								           end
+
+
+
+function cost(m, index)
+	          println("$index = $(JuMP.getvalue(m.ext[index]))")
+		         end
+

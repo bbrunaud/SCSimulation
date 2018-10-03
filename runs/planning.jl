@@ -21,10 +21,10 @@ function planning()
     @constraint(m, invbal[j in plants, p in products, t in periods], inv[j,p,t] == inv[j,p,t-1] + x[j,p,t] - sum(f[j,k,p,t] for k in customers) )
     @constraint(m, conudt[p in products, t in periods], udt[p,t] == sum(ud[k,p,t] for k in customers))
 
-    @expression(m, transportationCost, -10*sum(f[j,k,p,t] for (j,k,p,t) in keys(f)))
+    @expression(m, transportationCost, -10*sum((0.2/7*t+1-0.2/7)*f[j,k,p,t] for (j,k,p,t) in keys(f)))
     @expression(m, inventoryCost, sum(HC*inv[j,p,t] for (j,p,t) in keys(inv)))
     @expression(m, productionCost, AffExpr(0))
-    @expression(m, unsatisfied, -7*sum(ud[k,p,t] for k in customers for p in products for t in periods))
+    @expression(m, unsatisfied, -7*sum((0.2/7*t+1-0.2/7)*ud[k,p,t] for k in customers for p in products for t in periods))
     @objective(m, Min, transportationCost + inventoryCost + productionCost + unsatisfied)
 
     m.ext[:customers] = customers

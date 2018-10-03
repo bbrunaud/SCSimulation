@@ -26,6 +26,7 @@ function runsimu(d::SCSData, hours=6; seed=12345, name="", description="", verbo
     r.hours = hours
     r.deliveries = d.deliveries
     r.orders = d.orders
+    r.inventory = d.inventory
     r.gaps = d.gaps
     r.clocktime = toc()
     r.profit = d.profit
@@ -40,11 +41,17 @@ function runsimu(d::SCSData, hours=6; seed=12345, name="", description="", verbo
     numberofbacklogs = size(partial,1)
     numberofdeliveries = size(r.deliveries,1)
 
-    backlogamount = sum(partial[:Amount] - partial[:Delivered])
+    if size(partial,1) > 0
+	    backlogamount = sum(partial[:Amount] - partial[:Delivered])
+    else
+	    backlogamount = 0
+    end
     deliveredamount = sum(r.deliveries[:Amount])
-
+    
+    r.deliveredperhour = deliveredamount/r.hours
     r.backlogamount = backlogamount / deliveredamount
     r.backlognumber = numberofbacklogs / numberofdeliveries
     r.totaldelivered = deliveredamount
+    r.utilization = sum(r.orders[k,:ActualDuration] for k in 1:size(r.orders,1) if r.orders[k,:Status] == :Finished)/length(d.units[:M1])/r.hours
     return r
 end
