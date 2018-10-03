@@ -5,32 +5,47 @@ using Scheduling
 using Plasmo
 using JuMP
 using Distributions
-
-
-srand(12345)
-
-fcast_μ = Dict((:C1,i) => 2000 for i in [:P1,:P2])
-fcast_σ = Dict((:C1,i) => 700 for i in [:P1,:P2])
-custfor = Dict(:M1 => [:C1])
-ptype = Dict(:P1 => :MTS,
-             :P2 => :MTS)
-tk = Dict(:P1 => :Tk_P1, :P2 => :Tk_P2)
+using JLD
 
 include("planning.jl")
-include("kondili.jl")
-initialinventory = Dict((:M1,i,0) => 50.0 for i in n.materials[n.name])
-for p in [:A, :B, :C]
+include("knet.jl")
+
+
+function gensimu()
+
+fcast_μ = Dict((:C1,:P1) => 3500,
+                (:C1,:P2) => 3500,
+                (:C1,:P3) => 1500,
+                (:C1,:P4) => 1500)
+
+fcast_σ = Dict((:C1,:P1) => 1000,
+                (:C1,:P2) => 1000,
+                (:C1,:P3) => 600,
+                (:C1,:P4) => 600)
+
+custfor = Dict(:M1 => [:C1])
+ptype = Dict(:P1 => :MTS,
+             :P2 => :MTS,
+             :P3 => :MTO,
+             :P4 => :MTO)
+
+tk = Dict(:P1 => :Tk_P1, :P2 => :Tk_P2, :P3 => :Tk_P3, :P4 => :Tk_P4)
+
+initialinventory = Dict((:M1,i,0) => 1000.0 for i in n.materials[n.name])
+for p in [:A, :B, :C, :D]
     initialinventory[:M1,p,0] = 2e8
 end
 n.backlogpenalty = [1 for t in 1:n.periods]
 
 function graphgen()
 g = ModelGraph()
+scale = 10
 m = generatemodelUOPSS!(n, objective=[:minbacklog, :minbatches])
-solver = GurobiSolver(MIPGap=0.01, TimeLimit=100)
+solver = GurobiSolver(MIPGap=0.01, OutputFlag=0, TimeLimit=100)
 JuMP.setsolver(m,solver)
 Plasmo.setsolver(g, solver)
 pm = planning()
+m.obj *= 10
 n1 = add_node(g, pm)
 n2 = add_node(g, m)
 setattribute(n2,:network, n)
@@ -77,7 +92,7 @@ unitstatus = Dict((:M1, u) => :Available for u in n.units)
 
 
 d = SCSData([:C1],
-            [:P1, :P2],
+            [:P1, :P2, :P3, :P4],
             n.materials[n.name],
             [:M1],
             Dict(:M1 => n.units),
@@ -114,20 +129,27 @@ d = SCSData([:C1],
             2000,
 	    0)
 
-#runsimu(d, 3000, verbose=true)
+return d
+end
 
-function cs()
-	          cost(m1, :sales)
-		            cost(m1, :redirected)
-			              cost(m2, :profit)
-				                cost(m2, :backlogcost)
-						          cost(m2, :batchpenalty)
-							            cost(m2, :slack_prod)
-								           end
+function mrun(d, seed)
+	r = runsimu(d, 168*52, seed=seed, name="Kondili", description="Full,Production,Inf")
+	r
+end
 
 
-
-function cost(m, index)
-	          println("$index = $(JuMP.getvalue(m.ext[index]))")
-		         end
-
+ar = []
+#=
+for i in 20:30
+	println("")
+	println(" ############### RUN  $i  ################")
+	println("")
+	println("GENERATING SIMULATION OBJECT")
+	d = gensimu()
+	println("RUNNING SIMULATION")
+	r = mrun(d, 1000i)
+	println("SAVING")
+	push!(ar, r)
+	save("thirdrun.jld","ar",ar)
+end
+=#

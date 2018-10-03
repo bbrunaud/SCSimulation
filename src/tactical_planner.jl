@@ -44,11 +44,18 @@ function update_planning_model(d)
     end
     # Update demand
     D = getindex(m, :D)
+    ud = getindex(m, :ud)
+    f = getindex(m, :f)
+
     for c in d.customers
         for p in d.products
             for t in 1:m.ext[:numperiods]
                 JuMP.fix(D[c,p,t], d.forecast[c,p,tmap[t]])
+		        setupperbound(ud[c,p,t], d.forecast[c,p,tmap[t]])
                 setcategory(D[c,p,t], :Cont)
+		for j in d.plants
+			setupperbound(f[j,c,p,t], d.forecast[c,p,tmap[t]])
+		end
             end
         end
     end

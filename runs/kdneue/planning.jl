@@ -2,7 +2,7 @@ using JuMP
 using Gurobi
 
 plants = [:M1]
-products = [:P1, :P2]
+products = [:P1, :P2, :P3, :P4]
 periods = 1:8
 customers = [:C1]
 TC = Dict((:M1,:C1) => 0.01)

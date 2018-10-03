@@ -94,6 +94,11 @@ function update_scheduling_models(d::SCSData; verbose=false)
         m = getmodel(getnode(d.graph,n))
         D = getindex(m, :D)
 
+    	dd = getindex(m,:d)
+	for k in keys(dd)
+	    setupperbound(dd[k...],0)
+	end
+
         orders = @from row in d.deliveries begin
 		@where row.Plant == i && (row.Status == :Open || row.Status == :Backlog) && row.Date > d.currentperiod
                  @select {row.Number, row.Product, row.Date, row.Amount}
@@ -113,9 +118,11 @@ function update_scheduling_models(d::SCSData; verbose=false)
 	    d.ordermap[i, orders[k,:Product], modeltime] = orders[k,:Number]
             JuMP.setlowerbound(D[orders[k,:Product], modeltime], orders[k,:Amount])
             JuMP.setupperbound(D[orders[k,:Product], modeltime], orders[k,:Amount])
+            setupperbound(m[:d][orders[k,:Product], modeltime, modeltime], getupperbound(D[orders[k,:Product], modeltime]))
         end
         n += 1
     end
+
     # Update unavailable equipment
     for i in d.plants
 		n = 2
