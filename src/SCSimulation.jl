@@ -1,7 +1,7 @@
 
 module SCSimulation
 
-using ResumableFunctions
+
 using Distributions
 using JuMP
 using Plasmo
