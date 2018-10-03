@@ -23,8 +23,8 @@ end
 function update_planning_model(d)
     if d.iterations < Inf
         d.graph = d.graphfunction()
-        PlasmoAlgorithms.bdprepare(d.graph)
     end
+    PlasmoAlgorithms.bdprepare(d.graph)
     # Assuming the first node is the planning model
     node = getnode(d.graph,1)
     m = getmodel(node)

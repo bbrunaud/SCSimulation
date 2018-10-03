@@ -28,11 +28,13 @@ n.backlogpenalty = [1 for t in 1:n.periods]
 
 function graphgen()
 g = ModelGraph()
+scale = 10
 m = generatemodelUOPSS!(n, objective=[:minbacklog, :minbatches])
 solver = GurobiSolver(MIPGap=0.01, OutputFlag=0, TimeLimit=100)
 JuMP.setsolver(m,solver)
 Plasmo.setsolver(g, solver)
 pm = planning()
+m.obj *= 10
 n1 = add_node(g, pm)
 n2 = add_node(g, m)
 setattribute(n2,:network, n)

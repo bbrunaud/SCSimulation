@@ -9,8 +9,8 @@ using Distributions
 
 srand(12345)
 
-fcast_μ = Dict((:C1,i) => 3500 for i in [:P1,:P2])
-fcast_σ = Dict((:C1,i) => 1000 for i in [:P1,:P2])
+fcast_μ = Dict((:C1,i) => 2000 for i in [:P1,:P2])
+fcast_σ = Dict((:C1,i) => 700 for i in [:P1,:P2])
 custfor = Dict(:M1 => [:C1])
 ptype = Dict(:P1 => :MTS,
              :P2 => :MTS)
